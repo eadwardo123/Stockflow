@@ -1,0 +1,205 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Customer demand</p>
+        <h1 class="page-title">Pre-orders</h1>
+        <p class="page-subtitle">Capture customer demand before stock arrives so you can plan restocks and fulfillment.</p>
+    </div>
+</div>
+
+<div class="alert alert-info mb-4" role="alert" style="background:#eff6ff;border-left:4px solid #2563eb;color:#1d4ed8;">
+    Customers can reserve stock before it is physically received. Use this to track pending demand, delivery expectations, and fulfillment status.
+</div>
+
+<div id="message" class="alert d-none mb-4" role="alert"></div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-6">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon" style="background:rgba(37,99,235,.1);color:#2563eb;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v11H4z"/><path d="M8 7V5a4 4 0 018 0v2"/><path d="M8 12h8"/></svg>
+                </div>
+                <h3 class="op-card-title">Create pre-order</h3>
+            </div>
+            <div class="op-card-body">
+                <form id="preOrderForm" class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Customer</label>
+                        <input name="customerName" class="form-control" placeholder="e.g. Retail Store A" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Order date</label>
+                        <input name="orderDate" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Item</label>
+                        <select name="itemId" class="form-select" required>
+                            <option value="">Choose item</option>
+                            {{#each items}}
+                            <option value="{{id}}">{{item_name}} — {{brand_name}} ({{item_code}})</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Qty</label>
+                        <input name="quantity" type="number" min="0.001" step="0.001" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Unit price</label>
+                        <input name="unitPrice" type="number" min="0.01" step="0.01" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Expected delivery</label>
+                        <input name="expectedDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Notes</label>
+                        <input name="notes" class="form-control" placeholder="Optional notes">
+                    </div>
+                    <div class="col-12 pt-1">
+                        <button class="btn btn-primary" type="submit">Save pre-order</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-6">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon" style="background:rgba(5,150,105,.10);color:#059669;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+                </div>
+                <h3 class="op-card-title">Pre-order overview</h3>
+            </div>
+            <div class="op-card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="hero-panel-card">
+                            <div class="hero-panel-label">Pending</div>
+                            <div class="hero-panel-value">{{summary.pending}}</div>
+                            <div class="hero-panel-sub">Awaiting fulfillment</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="hero-panel-card">
+                            <div class="hero-panel-label">Fulfilled</div>
+                            <div class="hero-panel-value">{{summary.fulfilled}}</div>
+                            <div class="hero-panel-sub">Completed orders</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="hero-panel-card">
+                            <div class="hero-panel-label">Cancelled</div>
+                            <div class="hero-panel-value">{{summary.cancelled}}</div>
+                            <div class="hero-panel-sub">Closed reservations</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-panel">
+    <div class="section-panel-header">
+        <div>
+            <h3 class="section-panel-title">Pre-order list</h3>
+            <p class="section-panel-subtitle">Recent customer reservations and expected delivery timing</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit price</th>
+                    <th>Expected</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each preOrders}}
+                <tr>
+                    <td class="fw-semibold">{{customer_name}}</td>
+                    <td>{{item_name}} <span class="ref-mono">{{item_code}}</span></td>
+                    <td>{{quantity}}</td>
+                    <td>{{rupiah unit_price}}</td>
+                    <td class="text-muted" style="font-size:12px;">{{#if expected_date}}{{expected_date}}{{else}}—{{/if}}</td>
+                    <td>
+                        <span class="badge {{#if (eq status 'PENDING')}}badge-pending{{else if (eq status 'FULFILLED')}}badge-received{{else}}badge-neutral{{/if}}">
+                            {{status}}
+                        </span>
+                    </td>
+                    <td>
+                        {{#if (eq status 'PENDING')}}
+                        <button class="btn btn-sm btn-success fulfill-preorder" data-id="{{id}}">Mark fulfilled</button>
+                        {{else}}
+                        <span class="text-muted" style="font-size:12px;">No action</span>
+                        {{/if}}
+                    </td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <p>No pre-orders recorded yet.</p>
+                        </div>
+                    </td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const message = document.getElementById('message')
+
+const setMessage = (type, text) => {
+    message.className = `alert alert-${type} mb-4`
+    message.textContent = text
+    message.classList.remove('d-none')
+}
+
+document.getElementById('preOrderForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const payload = Object.fromEntries(new FormData(event.target))
+    try {
+        const response = await fetch('/api/pre-orders', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+            body: JSON.stringify(payload)
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error)
+        setMessage('success', result.message)
+        setTimeout(() => location.reload(), 500)
+    } catch (error) {
+        setMessage('danger', error.message)
+    }
+})
+
+document.querySelectorAll('.fulfill-preorder').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const id = button.dataset.id
+        try {
+            const response = await fetch(`/api/pre-orders/${id}/status`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+                body: JSON.stringify({status: 'FULFILLED'})
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error)
+            setMessage('success', result.message)
+            setTimeout(() => location.reload(), 500)
+        } catch (error) {
+            setMessage('danger', error.message)
+        }
+    })
+})
+</script>

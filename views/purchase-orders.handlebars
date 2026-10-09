@@ -1,0 +1,227 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">{{translate "Procurement"}}</p>
+        <h1 class="page-title">{{translate "Purchase and Pre-orders"}}</h1>
+        <p class="page-subtitle">{{translate "Buy stock from suppliers, receive it into your warehouse, and track customer demand before stock arrives."}}</p>
+    </div>
+</div>
+
+<div style="
+    display:flex;gap:1rem;flex-wrap:wrap;
+    background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;
+    padding:.9rem 1.25rem;margin-bottom:1.5rem;align-items:flex-start;
+">
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;">
+        <div style="width:28px;height:28px;background:#dcfce7;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#059669;flex-shrink:0;font-weight:800;font-size:13px;">1</div>
+        <div>
+            <div style="font-weight:700;font-size:13px;color:#065f46;">Create a purchase order</div>
+            <div style="font-size:12px;color:#16a34a;">Choose a supplier, item, quantity, and unit cost.</div>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;color:#86efac;font-size:18px;align-self:center;">→</div>
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;">
+        <div style="width:28px;height:28px;background:#dcfce7;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#059669;flex-shrink:0;font-weight:800;font-size:13px;">2</div>
+        <div>
+            <div style="font-weight:700;font-size:13px;color:#065f46;">Receive it into a warehouse</div>
+            <div style="font-size:12px;color:#16a34a;">Stock is added to inventory, the WAC average is updated, and a separate FIFO receipt layer is created. Choose one method on each sale.</div>
+        </div>
+    </div>
+</div>
+
+<div id="message" class="alert d-none mb-4" role="alert"></div>
+
+<div class="row g-4 mb-4">
+    <!-- ── Create PO ─────────────────────────────────────── -->
+    <div class="col-xl-6">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                </div>
+                <h3 class="op-card-title">{{translate "Create purchase order"}}</h3>
+            </div>
+            <div class="op-card-body">
+                <form id="purchaseForm" class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">{{translate "Supplier"}}</label>
+                        <select name="supplierId" class="form-select" required>
+                            {{#each suppliers}}
+                            <option value="{{id}}">{{supplier_name}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{translate "Order date"}}</label>
+                        <input name="poDate" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{translate "Item"}}</label>
+                        <select name="itemId" class="form-select" required>
+                            {{#each items}}
+                            <option value="{{id}}">{{item_name}} — {{brand_name}} ({{item_code}})</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{translate "Quantity"}}</label>
+                        <input name="quantity" type="number" min="0.001" step="0.001" class="form-control" placeholder="0" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{translate "Unit cost"}} ({{workspacePreferences.currency_code}})</label>
+                        <input name="unitCost" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{translate "Production date"}}</label>
+                        <input name="productionDate" type="date" class="form-control" required>
+                        <div class="form-text">Used to record the receipt date in the FIFO ledger; WAC and FIFO remain separate costing methods.</div>
+                    </div>
+                    <div class="col-12 pt-1">
+                        <button class="btn btn-primary" type="submit">{{translate "Place order"}}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Receive PO ────────────────────────────────────── -->
+    <div class="col-xl-6">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon" style="background:var(--color-success-soft);color:var(--color-success);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h3 class="op-card-title">{{translate "Receive pending order"}}</h3>
+            </div>
+            <div class="op-card-body">
+                <form id="receiveForm" class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">{{translate "Purchase order"}}</label>
+                        <select name="purchaseOrderId" class="form-select" required>
+                            <option value="">Choose pending order…</option>
+                            {{#each purchaseOrders}}
+                            {{#if (eq status 'PENDING')}}
+                            <option value="{{id}}">{{po_number}} · {{supplier_name}}</option>
+                            {{/if}}
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">{{translate "Destination warehouse"}}</label>
+                        <select name="warehouseId" class="form-select" required>
+                            {{#each warehouses}}
+                            <option value="{{id}}">{{warehouse_name}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">{{translate "Shelf"}} <span style="font-weight:400;color:var(--color-muted);">(optional)</span></label>
+                        <select name="shelfId" class="form-select">
+                            <option value="">{{translate "First shelf"}}</option>
+                            {{#each shelves}}
+                            <option value="{{id}}">{{shelf_code}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">{{translate "Supplier payment due date"}} <span class="text-muted">(optional)</span></label>
+                        <input name="purchaseDueDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-12 pt-1">
+                        <button class="btn btn-success" type="submit">{{translate "Receive stock"}}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Order history ─────────────────────────────────────── -->
+<div class="section-panel">
+    <div class="section-panel-header">
+        <div>
+            <h3 class="section-panel-title">{{translate "Order history"}}</h3>
+            <p class="section-panel-subtitle">{{translate "All purchase orders across all suppliers"}}</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>{{translate "PO number"}}</th>
+                    <th>{{translate "Supplier"}}</th>
+                    <th>{{translate "Date"}}</th>
+                    <th>{{translate "Total"}}</th>
+                    <th>{{translate "Status"}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each purchaseOrders}}
+                <tr>
+                    <td><span class="ref-mono">{{po_number}}</span></td>
+                    <td class="fw-semibold">{{supplier_name}}</td>
+                    <td class="text-muted" style="font-size:12px;">{{po_date}}</td>
+                    <td>{{rupiah total}}</td>
+                    <td>
+                        <span class="badge {{#if (eq status 'RECEIVED')}}badge-received{{else}}badge-pending{{/if}}">
+                            {{status}}
+                        </span>
+                    </td>
+                </tr>
+                {{else}}
+                <tr><td colspan="5">
+                    <div class="empty-state">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <p>{{translate "No purchase orders recorded yet."}}</p>
+                    </div>
+                </td></tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{> pre-orders-section}}
+
+<script>
+const message = document.getElementById('message')
+
+async function submitForm(form, endpoint, payload) {
+    try {
+        const r = await fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+            body: JSON.stringify(payload)
+        })
+        const j = await r.json()
+        if (!r.ok) throw new Error(j.error)
+        message.className = 'alert alert-success'
+        message.textContent = j.message
+        setTimeout(() => location.reload(), 600)
+    } catch (error) {
+        message.className = 'alert alert-danger'
+        message.textContent = error.message
+    }
+}
+
+document.getElementById('purchaseForm').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const v = Object.fromEntries(new FormData(e.target))
+    if (!v.productionDate || !e.target.elements.productionDate.validity.valid) {
+        message.className = 'alert alert-danger'
+        message.textContent = 'Production date must be a valid date.'
+        return
+    }
+    const p = {...v, items: [{itemId: v.itemId, quantity: v.quantity, unitCost: v.unitCost, productionDate: v.productionDate}]}
+    delete p.itemId; delete p.quantity; delete p.unitCost; delete p.productionDate
+    submitForm(e.target, '/api/purchase-orders', p)
+})
+
+document.getElementById('receiveForm').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const v = Object.fromEntries(new FormData(e.target))
+    const id = v.purchaseOrderId
+    delete v.purchaseOrderId
+    if (!v.shelfId) delete v.shelfId
+    submitForm(e.target, `/api/purchase-orders/${id}/receive`, v)
+})
+</script>

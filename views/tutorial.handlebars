@@ -1,0 +1,54 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">StockFlow</p>
+        <h1 class="page-title">{{translate "Beginner tutorial"}}</h1>
+        {{#if (eq workspacePreferences.language_code 'id')}}
+        <p class="page-subtitle">Panduan sederhana untuk mulai mengatur stok dan transaksi.</p>
+        {{else}}
+        <p class="page-subtitle">A straightforward guide to setting up stock and recording everyday work.</p>
+        {{/if}}
+    </div>
+</div>
+
+{{#if (eq workspacePreferences.language_code 'id')}}
+<div class="section-panel mb-4">
+    <div class="section-panel-header"><div><h2 class="section-panel-title">Mulai di sini</h2><p class="section-panel-subtitle">Ikuti langkahnya berurutan. Anda tidak perlu mengisi semuanya sekaligus.</p></div></div>
+    <div class="section-panel-body">
+        <ol class="mb-0">
+            <li class="mb-3"><strong>Buat tempat penyimpanan.</strong> Buka <a href="/master-data">Data utama</a>, lalu tambahkan gudang dan rak. Gudang adalah lokasi besar; rak adalah tempat barang di dalamnya.</li>
+            <li class="mb-3"><strong>Tambahkan barang dan pemasok.</strong> Buat satuan, merek, barang, dan pemasok. Gunakan nama dan kode yang mudah dikenali tim.</li>
+            <li class="mb-3"><strong>Catat barang masuk.</strong> Buka <a href="/purchase-orders">Pembelian dan Pre-order</a>, buat pesanan pembelian dari pemasok, lalu gunakan bagian penerimaan untuk menambahkan stok ke gudang.</li>
+            <li class="mb-3"><strong>Catat penjualan.</strong> Buka <a href="/stock-transactions">Transaksi stok</a>, pilih mode jual, barang, lokasi, jumlah, dan harga. Stok berkurang dan transaksi masuk ke jurnal.</li>
+            <li class="mb-3"><strong>Pindahkan atau pesan barang.</strong> Gunakan <a href="/transfers">Transfer</a> untuk memindahkan stok antar gudang. Gunakan bagian Pre-orders untuk mencatat permintaan pelanggan sebelum barang tersedia.</li>
+            <li><strong>Periksa pembayaran.</strong> Tambahkan tanggal jatuh tempo pada pembelian atau penjualan yang belum lunas. Dasbor akan menandai tagihan saat jatuh tempo atau terlambat.</li>
+        </ol>
+    </div>
+</div>
+<div class="section-panel">
+    <div class="section-panel-header"><div><h2 class="section-panel-title">Istilah singkat</h2></div></div>
+    <div class="section-panel-body"><p><strong>Purchase order:</strong> pesanan Anda kepada pemasok. <strong>Pre-order:</strong> permintaan pelanggan sebelum stok tersedia. <strong>Jatuh tempo:</strong> tanggal pembayaran harus dilakukan. <strong>FIFO/WAC:</strong> dua cara menghitung biaya stok, bukan jenis barang.</p></div>
+</div>
+{{else}}
+<div class="section-panel mb-4">
+    <div class="section-panel-header"><div><h2 class="section-panel-title">Start here</h2><p class="section-panel-subtitle">Follow these steps in order. You can do them over time.</p></div></div>
+    <div class="section-panel-body">
+        <ol class="mb-0">
+            <li class="mb-3"><strong>Create storage locations.</strong> Open <a href="/master-data">Master data</a> and add a warehouse and shelf. A warehouse is the larger location; a shelf is where the item sits.</li>
+            <li class="mb-3"><strong>Add items and suppliers.</strong> Create units, brands, items, and suppliers. Use names and codes your team will recognize.</li>
+            <li class="mb-3"><strong>Record incoming stock.</strong> Open <a href="/purchase-orders">Purchase and Pre-orders</a>, create a supplier purchase order, then use Receive stock to put the delivery into a warehouse.</li>
+            <li class="mb-3"><strong>Record a sale.</strong> Open <a href="/stock-transactions">Stock transactions</a>, choose Sell stock, then select the item, location, quantity, and price. Stock decreases and the transaction is added to the journal.</li>
+            <li class="mb-3"><strong>Move or reserve stock.</strong> Use <a href="/transfers">Transfers</a> to move stock between warehouses. Use the Pre-orders section to record customer demand before stock arrives.</li>
+            <li><strong>Track payments.</strong> Set a due date on an unpaid purchase or sale. The dashboard flags balances when they become due or overdue.</li>
+        </ol>
+    </div>
+</div>
+<div class="section-panel">
+    <div class="section-panel-header"><div><h2 class="section-panel-title">Quick glossary</h2></div></div>
+    <div class="section-panel-body"><p><strong>Purchase order:</strong> an order you place with a supplier. <strong>Pre-order:</strong> a customer's request before stock is available. <strong>Due date:</strong> when payment should be made. <strong>FIFO/WAC:</strong> two ways to calculate stock cost, not types of stock.</p></div>
+</div>
+{{/if}}
+
+<div class="d-flex flex-wrap gap-2 mt-4">
+    <a class="btn btn-primary" href="/">{{#if (eq workspacePreferences.language_code 'id')}}Kembali ke dasbor{{else}}Back to dashboard{{/if}}</a>
+    {{#if canManageMasterData}}<a class="btn btn-outline-secondary" href="/workspace-settings">{{#if (eq workspacePreferences.language_code 'id')}}Atur bahasa dan mata uang{{else}}Set language and currency{{/if}}</a>{{/if}}
+</div>

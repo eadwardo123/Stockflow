@@ -1,0 +1,143 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Movement control</p>
+        <h1 class="page-title">Warehouse Transfers</h1>
+        <p class="page-subtitle">Move available stock between warehouse locations.</p>
+    </div>
+</div>
+
+<div id="message" class="alert d-none mb-4" role="alert"></div>
+
+<div class="row g-4">
+    <!-- ── Transfer form ─────────────────────────────────── -->
+    <div class="col-xl-5">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </div>
+                <h3 class="op-card-title">New transfer</h3>
+            </div>
+            <div class="op-card-body">
+                <form id="transferForm" class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label">From warehouse</label>
+                        <select name="fromWarehouseId" class="form-select" required>
+                            {{#each warehouses}}
+                            <option value="{{id}}">{{warehouse_name}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">To warehouse</label>
+                        <select name="toWarehouseId" class="form-select" required>
+                            {{#each warehouses}}
+                            <option value="{{id}}">{{warehouse_name}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+
+                    <!-- Arrow indicator -->
+                    <div class="col-12 d-flex align-items-center justify-content-center" style="margin:-4px 0;">
+                        <div style="display:flex;align-items:center;gap:6px;color:var(--color-muted);font-size:12px;font-weight:600;">
+                            <div style="height:1px;width:40px;background:var(--color-border);"></div>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 19 12"/><polyline points="13 6 19 12 13 18"/></svg>
+                            <span>Transfer route</span>
+                            <div style="height:1px;width:40px;background:var(--color-border);"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-8">
+                        <label class="form-label">Item</label>
+                        <select name="itemId" class="form-select" required>
+                            {{#each items}}
+                            <option value="{{id}}">{{item_name}} — {{brand_name}} ({{item_code}})</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Quantity</label>
+                        <input name="quantity" type="number" min="0.001" step="0.001" class="form-control" placeholder="0" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes <span style="font-weight:400;color:var(--color-muted);">(optional)</span></label>
+                        <input name="notes" class="form-control" placeholder="Add a note…">
+                    </div>
+                    <div class="col-12 pt-1">
+                        <button class="btn btn-primary w-100" type="submit">Complete transfer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Transfer history ──────────────────────────────── -->
+    <div class="col-xl-7">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <div>
+                    <h3 class="section-panel-title">Transfer history</h3>
+                    <p class="section-panel-subtitle">All stock movements between warehouses</p>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Number</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#each transfers}}
+                        <tr>
+                            <td><span class="ref-mono">{{transfer_number}}</span></td>
+                            <td class="fw-semibold">{{from_warehouse}}</td>
+                            <td class="text-muted">{{to_warehouse}}</td>
+                            <td><span class="badge badge-completed">{{status}}</span></td>
+                            <td style="font-size:12px;color:var(--color-muted);">{{created_at}}</td>
+                        </tr>
+                        {{else}}
+                        <tr><td colspan="5">
+                            <div class="empty-state">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <p>No transfers recorded yet.</p>
+                            </div>
+                        </td></tr>
+                        {{/each}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const form = document.getElementById('transferForm')
+const message = document.getElementById('message')
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const v = Object.fromEntries(new FormData(form))
+    const payload = {...v, items: [{itemId: v.itemId, quantity: v.quantity}]}
+    delete payload.itemId; delete payload.quantity
+    try {
+        const r = await fetch('/api/transfers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+            body: JSON.stringify(payload)
+        })
+        const j = await r.json()
+        if (!r.ok) throw new Error(j.error)
+        message.className = 'alert alert-success'
+        message.textContent = j.message
+        setTimeout(() => location.reload(), 600)
+    } catch (error) {
+        message.className = 'alert alert-danger'
+        message.textContent = error.message
+    }
+})
+</script>

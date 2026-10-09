@@ -1,0 +1,47 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Item information</p>
+        <h1 class="page-title">{{item.item_name}}</h1>
+        <p class="page-subtitle">Complete stock, cost, brand, unit, production, and registration details.</p>
+    </div>
+    <a href="/stock-report" class="btn btn-outline-primary">Back to stock report</a>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Brand</div><div class="kpi-value" style="font-size:1.25rem;">{{item.brand_name}}</div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Unit</div><div class="kpi-value" style="font-size:1.25rem;">{{item.unit_name}}</div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Stock remaining</div><div class="kpi-value">{{number stock.quantity}}</div></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kpi-card"><div class="kpi-label">Average cost</div><div class="kpi-value" style="font-size:1.5rem;">{{rupiah item.avg_cost}}</div></div></div>
+</div>
+
+<div class="section-panel mb-4">
+    <div class="section-panel-header"><h2 class="section-panel-title">Item identity</h2></div>
+    <div class="section-panel-body">
+        <div class="row g-3">
+            <div class="col-md-4"><strong>Production code</strong><div class="text-muted">{{item.item_code}}</div></div>
+            <div class="col-md-4"><strong>Registered in system</strong><div class="text-muted">{{item.registered_at}}</div></div>
+            <div class="col-md-4"><strong>Minimum stock</strong><div class="text-muted">{{number item.minimum_stock}}</div></div>
+            <div class="col-12"><strong>Description</strong><div class="text-muted">{{item.description}}</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="section-panel mb-4">
+    <div class="section-panel-header">
+        <div><h2 class="section-panel-title">Remaining FIFO stock</h2><p class="section-panel-subtitle">Oldest production layers are issued first.</p></div>
+    </div>
+    <div class="table-responsive"><table class="table table-hover mb-0">
+        <thead><tr><th>Warehouse</th><th>Shelf</th><th>Remaining</th><th>Unit cost</th><th>Production date</th><th>Received</th></tr></thead>
+        <tbody>{{#each layers}}<tr><td>{{warehouse_name}}</td><td>{{shelf_code}}</td><td>{{remaining_quantity}}</td><td>{{rupiah unit_cost}}</td><td>{{production_date}}</td><td>{{received_at}}</td></tr>
+        {{else}}<tr><td colspan="6"><div class="empty-state"><p>No remaining FIFO stock.</p></div></td></tr>{{/each}}</tbody>
+    </table></div>
+</div>
+
+<div class="section-panel">
+    <div class="section-panel-header"><div><h2 class="section-panel-title">Purchase history</h2><p class="section-panel-subtitle">Cost, production date, supplier, and system registration date.</p></div></div>
+    <div class="table-responsive"><table class="table table-hover mb-0">
+        <thead><tr><th>PO</th><th>Supplier</th><th>Purchase date</th><th>Quantity</th><th>Cost</th><th>Production date</th><th>Registered</th></tr></thead>
+        <tbody>{{#each purchases}}<tr><td>{{po_number}}</td><td>{{supplier_name}}</td><td>{{po_date}}</td><td>{{quantity}}</td><td>{{rupiah unit_cost}}</td><td>{{production_date}}</td><td>{{registered_at}}</td></tr>
+        {{else}}<tr><td colspan="7"><div class="empty-state"><p>No purchase history.</p></div></td></tr>{{/each}}</tbody>
+    </table></div>
+</div>

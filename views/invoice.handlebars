@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Invoice {{invoice.reference_number}}</title>
+    <style>
+        body{font-family:Arial,sans-serif;color:#172033;max-width:820px;margin:40px auto;padding:0 24px}
+        header{display:flex;justify-content:space-between;border-bottom:2px solid #2563eb;padding-bottom:20px}
+        h1{margin:0;color:#2563eb} table{width:100%;border-collapse:collapse;margin-top:28px}
+        th,td{padding:12px;border-bottom:1px solid #dbe2ea;text-align:left} th{background:#eff6ff}
+        .totals{margin:24px 0 0 auto;width:300px}.totals div{display:flex;justify-content:space-between;padding:6px}
+        .grand{font-size:20px;font-weight:bold;border-top:2px solid #172033;margin-top:8px;padding-top:12px}
+        .meta{color:#64748b;font-size:13px;line-height:1.7}@media print{.no-print{display:none}body{margin:0}}
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align:right">
+        <a href="/invoice/{{invoice.id}}/download">Download PDF</a>
+        <button onclick="window.print()">Print invoice</button>
+    </div>
+    <header><div><h1>INVOICE</h1><div class="meta">Invoice: {{invoice.reference_number}}<br>Registered: {{invoice.registered_at}}</div></div>
+        <div class="meta"><strong>Customer</strong><br>{{invoice.customer_name}}</div></header>
+    <table><thead><tr><th>Item</th><th>Brand</th><th>Unit</th><th>Production code</th><th>Production date</th><th>Qty</th><th>Price</th></tr></thead>
+    <tbody><tr><td>{{invoice.item_name}}</td><td>{{invoice.brand_name}}</td><td>{{invoice.unit_name}}</td><td>{{invoice.item_code}}</td><td>{{invoice.production_date}}</td><td>{{invoice.quantity}}</td><td>{{rupiah invoice.sale_price}}</td></tr></tbody></table>
+    <div class="totals"><div><span>Subtotal</span><strong>{{rupiah subtotal}}</strong></div><div><span>Discount</span><strong>-{{rupiah discount}}</strong></div><div><span>Tax ({{invoice.tax_pct}}%)</span><strong>{{rupiah tax}}</strong></div><div class="grand"><span>Total</span><strong>{{rupiah total}}</strong></div></div>
+</body>
+</html>

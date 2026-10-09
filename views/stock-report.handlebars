@@ -1,0 +1,247 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Costing method · {{selectedMethod}}</p>
+        <h1 class="page-title">{{selectedMethod}} Costing Report</h1>
+        <p class="page-subtitle">This report shows {{selectedMethod}} costs only. Select WAC or FIFO in the Costing methods menu to switch views.</p>
+    </div>
+    <span class="badge badge-neutral" style="font-size:12px;padding:6px 12px;">
+        {{movement.movement_count}} movements tracked
+    </span>
+</div>
+
+<!-- Reset operational data section -->
+
+<div class="section-panel mb-4" style="border-color:#fecaca;background:#fffafa;">
+    <div class="section-panel-body d-flex align-items-center justify-content-between gap-3">
+        <div>
+            <div style="font-weight:700;color:#991b1b;">Reset operational data</div>
+            <div style="font-size:12px;color:#b91c1c;margin-top:3px;">
+                Deletes inventory, transactions, FIFO layers, purchase orders, transfers, and calculated costs.
+                Items, warehouses, shelves, suppliers, brands, and units are preserved.
+            </div>
+        </div>
+        <button id="resetOperationalData" type="button" class="btn btn-danger" style="white-space:nowrap;">
+            Reset operational data
+        </button>
+    </div>
+</div>
+
+<!-- delete operational data section delete at presentation -->
+
+<div class="kpi-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));">
+    <div class="kpi-card">
+        <div class="kpi-card-top">
+            <div class="kpi-label">Total stock</div>
+            <div class="kpi-icon indigo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+            </div>
+
+            <script>
+            document.getElementById('resetOperationalData').addEventListener('click', async () => {
+                const confirmed = window.confirm(
+                    'This will permanently delete all inventory, transactions, FIFO layers, purchase orders, transfers, and calculated costs. Master data will remain. Continue?'
+                )
+                if (!confirmed) return
+
+                const button = document.getElementById('resetOperationalData')
+                button.disabled = true
+                button.textContent = 'Resetting…'
+                try {
+                    const response = await fetch('/api/reset-operational-data', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()}
+                    })
+                    const result = await response.json()
+                    if (!response.ok) throw new Error(result.error || 'Reset failed')
+                    window.location.reload()
+                } catch (error) {
+                    button.disabled = false
+                    button.textContent = 'Reset operational data'
+                    window.alert(error.message)
+                }
+            })
+            </script>
+        </div>
+        <div class="kpi-value">{{number summary.total_stock}}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-card-top">
+            <div class="kpi-label">Active items</div>
+            <div class="kpi-icon sky">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value">{{summary.item_count}}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-card-top">
+            <div class="kpi-label">Stock in</div>
+            <div class="kpi-icon emerald">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="color:var(--color-success);">{{number movement.stock_in}}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-card-top">
+            <div class="kpi-label">Stock out</div>
+            <div class="kpi-icon amber">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="color:var(--color-warning);">{{number movement.stock_out}}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-card-top">
+            <div class="kpi-label">{{selectedMethod}} COGS</div>
+            <div class="kpi-icon" style="background:rgba(220,38,38,.1);color:#dc2626;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="font-size:1.5rem;">{{rupiah movement.selected_cogs}}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-card-top">
+            <div class="kpi-label">{{selectedMethod}} gross profit</div>
+            <div class="kpi-icon emerald">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="font-size:1.5rem;color:var(--color-success);">{{rupiah movement.selected_gross_profit}}</div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-8">
+        <div class="section-panel h-100">
+            <div class="section-panel-header">
+                <div>
+                    <h2 class="section-panel-title">Stock by warehouse</h2>
+                    <p class="section-panel-subtitle">Distribution across locations</p>
+                </div>
+            </div>
+            <div class="section-panel-body">
+                <div class="chart-frame"><canvas id="warehouseChart" aria-label="Stock quantity by warehouse"></canvas></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="section-panel h-100">
+            <div class="section-panel-header">
+                <div>
+                    <h2 class="section-panel-title">Movement direction</h2>
+                    <p class="section-panel-subtitle">Inbound vs outbound flow</p>
+                </div>
+            </div>
+            <div class="section-panel-body">
+                <div class="chart-frame"><canvas id="movementChart" aria-label="Stock in and stock out quantities"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-panel">
+    <div class="section-panel-header">
+        <div>
+            <h2 class="section-panel-title">Stock by item — {{selectedMethod}} cost &amp; pricing</h2>
+            <p class="section-panel-subtitle">{{#if (eq selectedMethod 'WAC')}}Cost is the weighted average purchase cost per unit.{{else}}Cost is the weighted unit cost of the remaining FIFO receipt layers, shown for reference; FIFO issues the oldest layers first.{{/if}} Historical gross profit uses actual sale price less discount and the selected method’s COGS, before commission and tax.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Code</th>
+                    <th>Qty</th>
+                    <th>Min stock</th>
+                    <th>{{#if (eq selectedMethod 'WAC')}}Avg cost (WAC){{else}}Remaining FIFO cost / unit{{/if}}</th>
+                    <th>Markup %</th>
+                    <th>Suggested price</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each byItem}}
+                <tr style="{{#if low_stock}}background:rgba(220,38,38,.03);{{/if}}">
+                    <td class="fw-semibold"><a href="/item-details/{{id}}">{{item_name}}</a></td>
+                    <td><span class="ref-mono">{{item_code}}</span></td>
+                    <td>{{quantity}}</td>
+                    <td class="text-muted">{{minimum_stock}}</td>
+                    <td>
+                        {{#if report_cost}}
+                        <span class="fw-semibold">{{rupiah report_cost}}</span>
+                        {{else}}
+                        <span class="text-muted" style="font-size:12px;">No cost yet</span>
+                        {{/if}}
+                    </td>
+                    <td class="text-muted">{{markup_pct}}%</td>
+                    <td>
+                        {{#if report_cost}}
+                        <span class="fw-semibold" style="color:var(--color-primary);">{{rupiah report_suggested_price}}</span>
+                        {{else}}
+                        <span class="text-muted" style="font-size:12px;">—</span>
+                        {{/if}}
+                    </td>
+                    <td>
+                        {{#if low_stock}}
+                        <span class="badge badge-danger">Low stock</span>
+                        {{else}}
+                        <span class="badge badge-received">Healthy</span>
+                        {{/if}}
+                    </td>
+                </tr>
+                {{else}}
+                <tr><td colspan="8"><div class="empty-state"><p>No item stock found.</p></div></td></tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script>
+    const warehouseLabels = [{{#each byWarehouse}}{{{json warehouse_name}}},{{/each}}]
+    const warehouseValues = [{{#each byWarehouse}}{{quantity}},{{/each}}]
+    const chartFont = {family: 'Inter, sans-serif', size: 12}
+
+    new Chart(document.getElementById('warehouseChart'), {
+        type: 'bar',
+        data: {
+            labels: warehouseLabels,
+            datasets: [{
+                label: 'Quantity',
+                data: warehouseValues,
+                backgroundColor: '#2563eb',
+                borderRadius: 5,
+                barThickness: 26
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {legend: {display: false}},
+            scales: {
+                x: {grid: {display: false}, ticks: {font: chartFont, color: '#64748b'}},
+                y: {beginAtZero: true, ticks: {font: chartFont, color: '#64748b'}, grid: {color: '#f1f5f9'}}
+            }
+        }
+    })
+
+    new Chart(document.getElementById('movementChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Stock in', 'Stock out'],
+            datasets: [{
+                data: [{{movement.stock_in}}, {{movement.stock_out}}],
+                backgroundColor: ['#059669', '#d97706'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {legend: {position: 'bottom', labels: {font: chartFont, color: '#64748b', padding: 20}}}
+        }
+    })
+</script>

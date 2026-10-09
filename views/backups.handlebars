@@ -1,0 +1,81 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Workspace administration</p>
+        <h1 class="page-title">Backups</h1>
+        <p class="page-subtitle">Encrypted workspace snapshots with seven-day retention.</p>
+    </div>
+    {{#if encryptionConfigured}}
+    <a class="btn btn-primary" href="/api/backups/export">Create and download backup</a>
+    {{/if}}
+</div>
+
+{{#unless encryptionConfigured}}
+<div class="alert alert-warning" role="alert">
+    <strong>Backup encryption is not configured.</strong>
+    Generate a key in PowerShell with <code>node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"</code>, set the output as <code>BACKUP_ENCRYPTION_KEY</code> in your private server environment, then restart StockFlow. Do not share the key or commit it.
+</div>
+{{/unless}}
+
+<div id="backupMessage" class="alert d-none mb-4" role="alert"></div>
+
+<div class="section-panel mb-4">
+    <div class="section-panel-header">
+        <div>
+            <h2 class="section-panel-title">Recent snapshots</h2>
+            <p class="section-panel-subtitle">The server keeps up to seven dated snapshots while it is running.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead><tr><th>Backup file</th><th>Download</th></tr></thead>
+            <tbody>
+                {{#each backups}}
+                <tr><td class="ref-mono">{{fileName}}</td><td><a class="btn btn-sm btn-outline-primary" href="{{href}}">Download</a></td></tr>
+                {{else}}
+                <tr><td colspan="2"><div class="empty-state"><p>No backup snapshots yet.</p></div></td></tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="op-card">
+    <div class="op-card-header"><h2 class="op-card-title">Restore workspace</h2></div>
+    <div class="op-card-body">
+        <p class="text-muted">Restore replaces records in this workspace. It only accepts an encrypted StockFlow snapshot made for this same workspace and schema.</p>
+        <form id="restoreBackupForm" class="row g-3 align-items-end">
+            <div class="col-md-8">
+                <label for="backupFile" class="form-label">Encrypted backup file</label>
+                <input id="backupFile" name="backupFile" class="form-control" type="file" accept=".sfbak,application/octet-stream" required {{#unless encryptionConfigured}}disabled{{/unless}}>
+            </div>
+            <div class="col-md-4"><button class="btn btn-danger" type="submit" {{#unless encryptionConfigured}}disabled{{/unless}}>Restore workspace</button></div>
+        </form>
+    </div>
+</div>
+
+<script>
+const backupMessage = document.getElementById('backupMessage')
+
+document.getElementById('restoreBackupForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const file = document.getElementById('backupFile').files[0]
+    if (!file || !window.confirm('Restore this backup? Current workspace records will be replaced.')) return
+    try {
+        const response = await fetch('/api/backups/restore', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/octet-stream', ...window.stockFlowCsrfHeaders()},
+            body: await file.arrayBuffer()
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Could not restore the workspace')
+        backupMessage.className = 'alert alert-success mb-4'
+        backupMessage.textContent = result.message
+        backupMessage.classList.remove('d-none')
+        setTimeout(() => location.reload(), 800)
+    } catch (error) {
+        backupMessage.className = 'alert alert-danger mb-4'
+        backupMessage.textContent = error.message
+        backupMessage.classList.remove('d-none')
+    }
+})
+</script>

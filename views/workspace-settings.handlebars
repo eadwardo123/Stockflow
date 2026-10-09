@@ -1,0 +1,70 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">{{translate "Workspace settings"}}</p>
+        <h1 class="page-title">{{translate "Workspace settings"}}</h1>
+        {{#if (eq workspacePreferences.language_code 'id')}}
+        <p class="page-subtitle">Pilih bahasa dan mata uang tampilan untuk seluruh ruang kerja.</p>
+        {{else}}
+        <p class="page-subtitle">Choose the display language and currency for this workspace.</p>
+        {{/if}}
+    </div>
+</div>
+
+<div id="settingsMessage" class="alert d-none mb-4" role="alert"></div>
+
+<div class="op-card" style="max-width:760px;">
+    <div class="op-card-header"><h2 class="op-card-title">{{#if (eq workspacePreferences.language_code 'id')}}Bahasa dan mata uang{{else}}Language and currency{{/if}}</h2></div>
+    <div class="op-card-body">
+        <form id="workspaceSettingsForm" class="row g-3">
+            <div class="col-md-6">
+                <label for="languageCode" class="form-label">{{#if (eq workspacePreferences.language_code 'id')}}Bahasa{{else}}Language{{/if}}</label>
+                <select id="languageCode" name="languageCode" class="form-select" required>
+                    <option value="en" {{#if (eq workspacePreferences.language_code 'en')}}selected{{/if}}>English</option>
+                    <option value="id" {{#if (eq workspacePreferences.language_code 'id')}}selected{{/if}}>Bahasa Indonesia</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="currencyCode" class="form-label">{{#if (eq workspacePreferences.language_code 'id')}}Mata uang tampilan{{else}}Display currency{{/if}}</label>
+                <select id="currencyCode" name="currencyCode" class="form-select" required>
+                    <option value="IDR" {{#if (eq workspacePreferences.currency_code 'IDR')}}selected{{/if}}>IDR · Indonesian rupiah</option>
+                    <option value="USD" {{#if (eq workspacePreferences.currency_code 'USD')}}selected{{/if}}>USD · US dollar</option>
+                    <option value="EUR" {{#if (eq workspacePreferences.currency_code 'EUR')}}selected{{/if}}>EUR · Euro</option>
+                    <option value="GBP" {{#if (eq workspacePreferences.currency_code 'GBP')}}selected{{/if}}>GBP · Pound sterling</option>
+                    <option value="SGD" {{#if (eq workspacePreferences.currency_code 'SGD')}}selected{{/if}}>SGD · Singapore dollar</option>
+                    <option value="MYR" {{#if (eq workspacePreferences.currency_code 'MYR')}}selected{{/if}}>MYR · Malaysian ringgit</option>
+                    <option value="AUD" {{#if (eq workspacePreferences.currency_code 'AUD')}}selected{{/if}}>AUD · Australian dollar</option>
+                    <option value="JPY" {{#if (eq workspacePreferences.currency_code 'JPY')}}selected{{/if}}>JPY · Japanese yen</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <p class="text-muted mb-0">{{#if (eq workspacePreferences.language_code 'id')}}Mata uang hanya mengubah tampilan. Nilai lama tidak dikonversi dengan kurs valuta asing.{{else}}Currency changes are display-only. Existing values are not converted using foreign-exchange rates.{{/if}}</p>
+            </div>
+            <div class="col-12"><button class="btn btn-primary" type="submit">{{translate "Save settings"}}</button></div>
+        </form>
+    </div>
+</div>
+
+<script>
+const workspaceSettingsForm = document.getElementById('workspaceSettingsForm')
+const settingsMessage = document.getElementById('settingsMessage')
+workspaceSettingsForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+        const response = await fetch('/api/workspace-settings/preferences', {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+            body: JSON.stringify(Object.fromEntries(new FormData(workspaceSettingsForm)))
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Could not save workspace settings')
+        settingsMessage.className = 'alert alert-success mb-4'
+        settingsMessage.textContent = result.message
+        settingsMessage.classList.remove('d-none')
+        setTimeout(() => location.reload(), 500)
+    } catch (error) {
+        settingsMessage.className = 'alert alert-danger mb-4'
+        settingsMessage.textContent = error.message
+        settingsMessage.classList.remove('d-none')
+    }
+})
+</script>

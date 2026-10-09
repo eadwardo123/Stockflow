@@ -1,0 +1,33 @@
+{
+  "name": "file",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "express-handlebars": "^8.0.3",
+    "express-mysql-session": "^3.0.3",
+    "express-rate-limit": "^8.7.0",
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0", "mysql2": "^3.24.4",
+    "pdfkit": "^0.20.2",
+    "socket.io": "^4.8.4",
+    "stripe": "^23.0.0"
+  },
+  "overrides": {
+    "express-mysql-session": {
+      "mysql2": "3.24.4"
+    },
+    "brace-expansion": "^5.0.12"
+  }
+}

@@ -1,0 +1,485 @@
+<style>
+    .md-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 4px;
+        background: var(--color-bg);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        margin-bottom: 1.5rem;
+    }
+
+    .md-tab {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-muted);
+        text-decoration: none;
+        transition: all .15s ease;
+        border: 1px solid transparent;
+        cursor: pointer;
+    }
+
+    .md-tab:hover {
+        background: var(--color-surface);
+        color: var(--color-text);
+    }
+
+    .md-tab.active {
+        background: var(--color-surface);
+        border-color: var(--color-border);
+        color: var(--color-primary);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .record-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--color-border-soft);
+    }
+
+    .record-list-item:last-child { border-bottom: 0; }
+
+    .record-list-name {
+        font-weight: 600;
+        font-size: 13.5px;
+        color: var(--color-text);
+    }
+
+    .record-list-sub {
+        font-size: 11.5px;
+        color: var(--color-muted);
+        margin-top: 1px;
+    }
+
+    .record-list-badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 20px;
+        background: var(--color-primary-soft);
+        color: var(--color-primary);
+    }
+</style>
+
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Setup</p>
+        <h1 class="page-title">Master Data</h1>
+        <p class="page-subtitle">Add and review records for warehouses, items, suppliers, and more.</p>
+    </div>
+</div>
+
+<div id="message" class="alert d-none mb-4" role="alert"></div>
+
+<!-- ── Tab navigation ──────────────────────────────────── -->
+<nav class="md-tabs" aria-label="Master data sections">
+    <button class="md-tab" data-master-section="warehouses">Warehouses</button>
+    <button class="md-tab" data-master-section="shelves">Shelves</button>
+    <button class="md-tab" data-master-section="brands">Brands</button>
+    <button class="md-tab" data-master-section="units">Units</button>
+    <button class="md-tab" data-master-section="items">Items</button>
+    <button class="md-tab" data-master-section="suppliers">Suppliers</button>
+    <button class="md-tab" data-master-section="pricing">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-1px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        Pricing
+    </button>
+</nav>
+
+<!-- ── Form panels ─────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+
+    <!-- Warehouses -->
+    <div class="col-xl-6 master-data-panel" data-master-section="warehouses">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <h3 class="op-card-title">Add warehouse</h3>
+            </div>
+            <div class="op-card-body">
+                <form data-endpoint="/api/warehouses" class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Warehouse name</label><input name="warehouseName" class="form-control" required></div>
+                    <div class="col-md-6"><label class="form-label">Address</label><input name="address" class="form-control" required></div>
+                    <div class="col-md-4"><label class="form-label">Contact person</label><input name="contactName" class="form-control" ></div>
+                    <div class="col-md-4"><label class="form-label">Phone</label><input name="contact" class="form-control" ></div>
+                    <div class="col-md-4"><label class="form-label">Email</label><input name="email" type="email" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label">First shelf code</label><input name="shelfCode" class="form-control" value="MAIN" required></div>
+                    <div class="col-md-6"><label class="form-label">Shelf block</label><input name="shelfBlock" class="form-control" value="MAIN" required></div>
+                    <div class="col-12 pt-1"><button class="btn btn-primary" type="submit">Add warehouse</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shelves -->
+    <div class="col-xl-6 master-data-panel" data-master-section="shelves">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                </div>
+                <h3 class="op-card-title">Add shelf</h3>
+            </div>
+            <div class="op-card-body">
+                <form data-endpoint="/api/shelves" class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Warehouse</label><select name="warehouseId" class="form-select" required><option value="">Choose warehouse</option>{{#each warehouses}}<option value="{{id}}">{{warehouse_name}}</option>{{/each}}</select></div>
+                    <div class="col-md-3"><label class="form-label">Shelf code</label><input name="shelfCode" class="form-control" required></div>
+                    <div class="col-md-3"><label class="form-label">Block</label><input name="shelfBlock" class="form-control" required></div>
+                    <div class="col-12 pt-1"><button class="btn btn-primary" type="submit">Add shelf</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Brands -->
+    <div class="col-md-6 col-xl-3 master-data-panel" data-master-section="brands">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="14.31" y1="8" x2="20.05" y2="17.94"/><line x1="9.69" y1="8" x2="21.17" y2="8"/><line x1="7.38" y1="12" x2="13.12" y2="2.06"/><line x1="9.69" y1="16" x2="3.95" y2="6.06"/><line x1="14.31" y1="16" x2="2.83" y2="16"/><line x1="16.62" y1="12" x2="10.88" y2="21.94"/></svg>
+                </div>
+                <h3 class="op-card-title">Add brand</h3>
+            </div>
+            <div class="op-card-body">
+                <form data-endpoint="/api/brands" class="row g-3">
+                    <div class="col-12"><label class="form-label">Brand name</label><input name="brandName" class="form-control" required></div>
+                    <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="2" required></textarea></div>
+                    <div class="col-12 pt-1"><button class="btn btn-primary" type="submit">Add brand</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Units -->
+    <div class="col-md-6 col-xl-3 master-data-panel" data-master-section="units">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                </div>
+                <h3 class="op-card-title">Add unit</h3>
+            </div>
+            <div class="op-card-body">
+                <form data-endpoint="/api/units" class="row g-3">
+                    <div class="col-12"><label class="form-label">Unit name</label><input name="unitName" class="form-control" placeholder="e.g. Piece, Box, Kg" required></div>
+                    <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="2" required></textarea></div>
+                    <div class="col-12 pt-1"><button class="btn btn-primary" type="submit">Add unit</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items -->
+    <div class="col-md-6 col-xl-6 master-data-panel" data-master-section="items">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                </div>
+                <h3 class="op-card-title">Add item</h3>
+            </div>
+            <div class="op-card-body">
+                <form data-endpoint="/api/items" class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Item name</label><input name="itemName" class="form-control" required></div>
+                    <div class="col-md-6"><label class="form-label">Item code</label><input name="itemCode" class="form-control" required></div>
+                    <div class="col-md-5"><label class="form-label">Brand</label><select name="brandId" class="form-select" required><option value="">Choose brand</option>{{#each brands}}<option value="{{id}}">{{brand_name}}</option>{{/each}}</select></div>
+                    <div class="col-md-4"><label class="form-label">Unit</label><select name="unitId" class="form-select" required><option value="">Choose unit</option>{{#each units}}<option value="{{id}}">{{unit_name}}</option>{{/each}}</select></div>
+                    <div class="col-md-3"><label class="form-label">Min. stock</label><input name="minimumStock" type="number" min="0" step="0.001" class="form-control" value="0"></div>
+                    <div class="col-12"><label class="form-label">Description <span style="font-weight:400;color:var(--color-muted);">(optional)</span></label><input name="description" class="form-control"></div>
+                    <div class="col-12 pt-1"><button class="btn btn-primary" type="submit">Add item</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suppliers -->
+    <div class="col-md-6 col-xl-6 master-data-panel" data-master-section="suppliers">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                </div>
+                <h3 class="op-card-title">Add supplier</h3>
+            </div>
+            <div class="op-card-body">
+                <form data-endpoint="/api/suppliers" class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Supplier name</label><input name="supplierName" class="form-control" required></div>
+                    <div class="col-md-6"><label class="form-label">Contact</label><input name="contact" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label">Email</label><input name="email" type="email" class="form-control"></div>
+                    <div class="col-md-6"><label class="form-label">Address</label><input name="address" class="form-control"></div>
+                    <div class="col-12 pt-1"><button class="btn btn-primary" type="submit">Add supplier</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Record lists ─────────────────────────────────────── -->
+<div class="row g-4">
+    <div class="col-md-6 col-xl-4 master-data-panel" data-master-section="warehouses">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <h3 class="section-panel-title">Warehouses</h3>
+                <span class="record-list-badge">{{warehouses.length}}</span>
+            </div>
+            <div class="section-panel-body" style="max-height:280px;overflow-y:auto;">
+                {{#each warehouses}}
+                <div class="record-list-item">
+                    <div>
+                        <div class="record-list-name">{{warehouse_name}}</div>
+                        <div class="record-list-sub">ID {{id}}</div>
+                    </div>
+                </div>
+                {{else}}<p class="text-muted mb-0" style="font-size:13px;">No warehouses added yet.</p>{{/each}}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4 master-data-panel" data-master-section="shelves">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <h3 class="section-panel-title">Shelves</h3>
+                <span class="record-list-badge">{{shelves.length}}</span>
+            </div>
+            <div class="section-panel-body" style="max-height:280px;overflow-y:auto;">
+                {{#each shelves}}
+                <div class="record-list-item">
+                    <div>
+                        <div class="record-list-name">{{shelf_code}}</div>
+                        <div class="record-list-sub">Warehouse ID {{warehouse_id}}</div>
+                    </div>
+                </div>
+                {{else}}<p class="text-muted mb-0" style="font-size:13px;">No shelves added yet.</p>{{/each}}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4 master-data-panel" data-master-section="brands">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <h3 class="section-panel-title">Brands</h3>
+                <span class="record-list-badge">{{brands.length}}</span>
+            </div>
+            <div class="section-panel-body" style="max-height:280px;overflow-y:auto;">
+                {{#each brands}}
+                <div class="record-list-item">
+                    <div>
+                        <div class="record-list-name">{{brand_name}}</div>
+                        <div class="record-list-sub">{{brand_description}}</div>
+                    </div>
+                </div>
+                {{else}}<p class="text-muted mb-0" style="font-size:13px;">No brands added yet.</p>{{/each}}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4 master-data-panel" data-master-section="units">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <h3 class="section-panel-title">Units</h3>
+                <span class="record-list-badge">{{units.length}}</span>
+            </div>
+            <div class="section-panel-body" style="max-height:280px;overflow-y:auto;">
+                {{#each units}}
+                <div class="record-list-item">
+                    <div>
+                        <div class="record-list-name">{{unit_name}}</div>
+                        <div class="record-list-sub">{{descriptions}}</div>
+                    </div>
+                </div>
+                {{else}}<p class="text-muted mb-0" style="font-size:13px;">No units added yet.</p>{{/each}}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4 master-data-panel" data-master-section="items">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <h3 class="section-panel-title">Items</h3>
+                <span class="record-list-badge">{{items.length}}</span>
+            </div>
+            <div class="section-panel-body" style="max-height:280px;overflow-y:auto;">
+                {{#each items}}
+                <div class="record-list-item">
+                    <div>
+                        <div class="record-list-name">{{item_name}}</div>
+                        <div class="record-list-sub">{{brand_name}} · <span class="ref-mono">{{item_code}}</span></div>
+                    </div>
+                </div>
+                {{else}}<p class="text-muted mb-0" style="font-size:13px;">No items added yet.</p>{{/each}}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4 master-data-panel" data-master-section="suppliers">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <h3 class="section-panel-title">Suppliers</h3>
+                <span class="record-list-badge">{{suppliers.length}}</span>
+            </div>
+            <div class="section-panel-body" style="max-height:280px;overflow-y:auto;">
+                {{#each suppliers}}
+                <div class="record-list-item">
+                    <div>
+                        <div class="record-list-name">{{supplier_name}}</div>
+                        <div class="record-list-sub">{{#if email}}{{email}}{{else}}No email{{/if}}</div>
+                    </div>
+                </div>
+                {{else}}<p class="text-muted mb-0" style="font-size:13px;">No suppliers added yet.</p>{{/each}}
+            </div>
+        </div>
+    </div>
+    <div class="col-12 master-data-panel" data-master-section="pricing">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <div>
+                    <h3 class="section-panel-title">Item pricing — Weighted Average Cost</h3>
+                    <p class="section-panel-subtitle">Avg cost updates automatically when purchase orders are received. Edit the markup % to set your suggested selling price.</p>
+                </div>
+                <span class="badge badge-neutral" style="font-size:11px;">WAC method</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Code</th>
+                            <th>Avg cost (WAC)</th>
+                            <th>Markup %</th>
+                            <th>Suggested price</th>
+                            <th style="width:80px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricingTableBody">
+                        {{#each itemCosts}}
+                        <tr data-item-id="{{item_id}}">
+                            <td class="fw-semibold">{{item_name}}</td>
+                            <td><span class="ref-mono">{{item_code}}</span></td>
+                            <td>
+                                {{#if avg_cost}}
+                                <span class="fw-semibold">{{rupiah avg_cost}}</span>
+                                {{else}}
+                                <span class="text-muted" style="font-size:12px;">No cost yet</span>
+                                {{/if}}
+                            </td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm markup-input"
+                                       value="{{markup_pct}}" min="0" step="0.01"
+                                       style="width:90px;display:inline-block;">
+                            </td>
+                            <td>
+                                {{#if avg_cost}}
+                                <span class="fw-semibold suggested-price" style="color:var(--color-primary);">{{rupiah suggested_price}}</span>
+                                {{else}}
+                                <span class="text-muted suggested-price" style="font-size:12px;">—</span>
+                                {{/if}}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary save-markup-btn" style="font-size:11px;">Save</button>
+                            </td>
+                        </tr>
+                        {{else}}
+                        <tr><td colspan="6"><div class="empty-state"><p>No items found. Add items first.</p></div></td></tr>
+                        {{/each}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const mdTabs = document.querySelectorAll('.md-tab')
+const mdPanels = document.querySelectorAll('.master-data-panel')
+const message = document.getElementById('message')
+
+const setMessage = (type, text) => {
+    message.className = `alert alert-${type} mb-4`
+    message.textContent = text
+    message.classList.remove('d-none')
+}
+
+function showMasterSection(section) {
+    const valid = [...mdTabs].some((t) => t.dataset.masterSection === section)
+    const target = valid ? section : 'warehouses'
+    mdTabs.forEach((t) => t.classList.toggle('active', t.dataset.masterSection === target))
+    mdPanels.forEach((p) => { p.hidden = p.dataset.masterSection !== target })
+}
+
+showMasterSection(window.location.hash.slice(1))
+mdTabs.forEach((tab) => tab.addEventListener('click', () => {
+    window.location.hash = tab.dataset.masterSection
+    showMasterSection(tab.dataset.masterSection)
+}))
+
+// ── Inline markup save ──────────────────────────────────────
+document.querySelectorAll('.save-markup-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+        const row = btn.closest('tr')
+        const itemId = row.dataset.itemId
+        const markupInput = row.querySelector('.markup-input')
+        const markupPct = Number(markupInput.value)
+        btn.disabled = true
+        btn.textContent = 'Saving...'
+        try {
+            const r = await fetch(`/api/item-costs/${itemId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+                body: JSON.stringify({markupPct})
+            })
+            const j = await r.json()
+            if (!r.ok) throw new Error(j.error)
+            setMessage('success', j.message + ' — refresh to see the updated suggested price.')
+            btn.textContent = '✓ Saved'
+            setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false }, 2500)
+        } catch (error) {
+            setMessage('danger', error.message)
+            btn.textContent = 'Save'
+            btn.disabled = false
+        }
+    })
+})
+
+// ── Master data form submissions ────────────────────────────
+document.querySelectorAll('form[data-endpoint]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const submitButton = form.querySelector('button[type="submit"]')
+        if (!form.reportValidity()) return
+
+        submitButton.disabled = true
+        submitButton.textContent = 'Saving...'
+        try {
+            const response = await fetch(form.dataset.endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+                body: JSON.stringify(Object.fromEntries(new FormData(form)))
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error)
+            setMessage('success', result.message)
+            setTimeout(() => location.reload(), 500)
+        } catch (error) {
+            setMessage('danger', error.message)
+            submitButton.disabled = false
+            submitButton.textContent = submitButton.dataset.originalText || 'Add item'
+        } finally {
+            if (!submitButton.disabled) {
+                submitButton.textContent = submitButton.dataset.originalText || submitButton.textContent
+            }
+        }
+    })
+})
+
+window.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('button[type="submit"]').forEach((button) => {
+        button.dataset.originalText = button.textContent
+    })
+})
+</script>

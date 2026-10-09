@@ -1,0 +1,35 @@
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Workspace administration</p>
+        <h1 class="page-title">Audit log</h1>
+        <p class="page-subtitle">Recent workspace write attempts and their outcomes. Request bodies are not stored.</p>
+    </div>
+</div>
+
+<div class="section-panel">
+    <div class="section-panel-header">
+        <div>
+            <h2 class="section-panel-title">Recent activity</h2>
+            <p class="section-panel-subtitle">Latest 200 write actions in this workspace</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead><tr><th>Time</th><th>Member</th><th>Role</th><th>Action</th><th>Record</th><th>Result</th></tr></thead>
+            <tbody>
+                {{#each events}}
+                <tr>
+                    <td class="text-muted">{{created_at}}</td>
+                    <td class="fw-semibold">{{actor_username}}</td>
+                    <td>{{actor_role}}</td>
+                    <td>{{action}} / {{resource}}</td>
+                    <td>{{#if target_id}}{{target_id}}{{else}}—{{/if}}</td>
+                    <td><span class="badge {{#if succeeded}}badge-received{{else}}badge-neutral{{/if}}">{{#if succeeded}}Succeeded{{else}}Failed ({{status_code}}){{/if}}</span></td>
+                </tr>
+                {{else}}
+                <tr><td colspan="6"><div class="empty-state"><p>No workspace activity recorded yet.</p></div></td></tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>

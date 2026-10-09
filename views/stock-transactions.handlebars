@@ -1,0 +1,802 @@
+<style>
+    .cost-panel {
+        background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+        border: 1px solid #bfdbfe;
+        border-radius: var(--radius-md);
+        padding: 1rem 1.2rem;
+        margin-top: 1rem;
+    }
+    .cost-panel-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--color-primary);
+        margin-bottom: 10px;
+    }
+    .cost-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px solid #dbeafe;
+        font-size: 13px;
+    }
+    .cost-row:last-child { border-bottom: 0; }
+    .cost-row-label { color: var(--color-muted); font-weight: 500; }
+    .cost-row-value { font-weight: 700; color: var(--color-text); }
+    .cost-row-value.primary { color: var(--color-primary); }
+    .cost-row-value.success { color: var(--color-success); }
+    .margin-bar-wrap { margin-top: 10px; }
+    .margin-bar-bg {
+        height: 6px;
+        background: #e0e7ff;
+        border-radius: 99px;
+        overflow: hidden;
+    }
+    .margin-bar-fill {
+        height: 100%;
+        border-radius: 99px;
+        background: linear-gradient(90deg, var(--color-primary), #60a5fa);
+        transition: width .3s ease;
+    }
+</style>
+
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Inventory ledger</p>
+        <h1 class="page-title">Stock Transactions</h1>
+        <p class="page-subtitle">Record customer sales and returns, then review every movement.</p>
+    </div>
+</div>
+
+{{!-- Supplier restock callout ------------------------------------------------}}
+<div style="
+    display:flex;align-items:center;gap:14px;
+    background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;
+    padding:.9rem 1.25rem;margin-bottom:1.5rem;
+">
+    <div style="flex-shrink:0;width:38px;height:38px;border-radius:8px;background:#dbeafe;
+                display:flex;align-items:center;justify-content:center;color:#2563eb;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+    </div>
+    <div style="flex:1;">
+        <div style="font-weight:700;font-size:13.5px;color:#1e40af;">Want to restock from a supplier?</div>
+        <div style="font-size:12.5px;color:#3b82f6;margin-top:1px;">
+            This page is for <strong>customer sales &amp; returns</strong> only.
+            To add new stock from a supplier, create a <strong>Purchase Order</strong> and receive it.
+        </div>
+    </div>
+    <a href="/purchase-orders" class="btn btn-sm btn-primary" style="white-space:nowrap;flex-shrink:0;">
+        Go to Purchase orders →
+    </a>
+</div>
+
+<div id="message" class="alert d-none mb-4" role="alert"></div>
+
+{{!-- Pass item cost data and stock data as JSON for dynamic filtering --}}
+<script id="inventory-stock-data" type="application/json">{{{inventoryStockJson}}}</script>
+<script id="fifo-layers-data" type="application/json">{{{fifoLayersJson}}}</script>
+<script id="all-warehouses-data" type="application/json">{{{allWarehousesJson}}}</script>
+<script id="all-shelves-data" type="application/json">{{{allShelvesJson}}}</script>
+
+<script>
+const ITEM_COSTS = {}
+{{#each itemCosts}}
+ITEM_COSTS[{{item_id}}] = {
+    avg_cost: {{avg_cost}},
+    markup_pct: {{markup_pct}},
+    suggested_price: {{suggested_price}}
+}
+{{/each}}
+</script>
+
+<div class="row g-4">
+    <!-- ── Transaction form ─────────────────────────────── -->
+    <div class="col-xl-4" id="transaction-form">
+        <div class="op-card">
+            <div class="op-card-header">
+                <div class="op-card-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                </div>
+                <h3 class="op-card-title">New transaction</h3>
+            </div>
+            <div class="op-card-body">
+                <form id="transactionForm" class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Transaction mode</label>
+                        <div class="btn-group w-100 mb-2" role="group" aria-label="Choose buy or sell">
+                            <button type="button" class="btn btn-outline-primary active" data-transaction-mode="SELL" aria-pressed="true">Sell stock</button>
+                            <button type="button" class="btn btn-outline-primary" data-transaction-mode="PURCHASE" aria-pressed="false">Buy stock</button>
+                            <button type="button" class="btn btn-outline-secondary" data-transaction-mode="BUY" aria-pressed="false">Customer return</button>
+                        </div>
+                        <select name="type" id="txnType" class="form-select visually-hidden" aria-hidden="true" tabindex="-1">
+                            <option value="SELL">Sell to customer (stock goes OUT)</option>
+                            <option value="PURCHASE">Buy stock from supplier (stock comes IN)</option>
+                            <option value="BUY">Customer return / buy-back (stock comes IN)</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" id="counterpartyLabel">Customer name</label>
+                        <input name="customerName" id="counterpartyName" class="form-control" placeholder="Enter customer name" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Item</label>
+                        <select name="itemId" id="txnItem" class="form-select" required>
+                            {{#each items}}
+                            <option value="{{id}}">{{item_name}} — {{brand_name}} ({{item_code}})</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Serial number <span class="text-muted">(optional)</span></label>
+                        <input name="serialNumber" class="form-control" placeholder="Leave blank if the item has no serial number">
+                    </div>
+                    <div class="col-12" id="stockAlert" style="display:none;">
+                        <div class="alert alert-warning py-2 px-3 mb-0 d-flex align-items-center gap-2" style="font-size:12.5px;border-radius:8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span><strong>Out of stock:</strong> This item is not held in any warehouse. Restock via Purchase Orders first.</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Quantity</label>
+                        <input name="quantity" id="txnQty" type="number" min="0.001" step="0.001" class="form-control" placeholder="0" required>
+                        <div id="qtyAvailableText" style="font-size:11.5px;margin-top:4px;font-weight:500;"></div>
+                    </div>
+                    <div class="col-12" id="costingMethodField">
+                        <label class="form-label">Costing method for this sale</label>
+                        <input type="hidden" name="costingMethod" id="costingMethod" value="WAC">
+                        <div class="btn-group w-100" role="group" aria-label="Select one costing method for this sale">
+                            <button type="button" class="btn btn-outline-primary active" data-costing-method="WAC" aria-pressed="true">WAC · average cost</button>
+                            <button type="button" class="btn btn-outline-primary" data-costing-method="FIFO" aria-pressed="false">FIFO · oldest stock first</button>
+                        </div>
+                        <div class="form-text">Only the selected method calculates COGS and profit for this sale.</div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Selling price / unit</label>
+                        <input name="salePrice" id="salePrice" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00" required>
+                    </div>
+                    <div class="col-6" id="taxField">
+                        <label class="form-label">Tax %</label>
+                        <input name="taxPct" type="number" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                    <div class="col-6" id="discountField">
+                        <label class="form-label">Adjustment / discount</label>
+                        <input name="discountAmount" type="number" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                    <div class="col-6" id="purchaseCostField" hidden>
+                        <label class="form-label">Purchase price / unit</label>
+                        <input name="purchaseUnitCost" id="purchaseUnitCost" type="number" min="0.01" step="0.0001" class="form-control" placeholder="0.00">
+                    </div>
+                    <div class="col-6" id="returnCostField" hidden>
+                        <label class="form-label">Returned stock cost / unit</label>
+                        <input name="returnUnitCost" id="returnUnitCost" type="number" min="0.01" step="0.0001" class="form-control" placeholder="Enter the original unit cost">
+                    </div>
+                    <div class="col-6" id="productionDateField" hidden>
+                        <label class="form-label">Production date</label>
+                        <input name="productionDate" id="productionDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Amount paid / received</label>
+                        <input name="amountPaid" type="number" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                    <div class="col-6" id="purchaseSettlementDateField" hidden>
+                        <label class="form-label">Purchase settlement date <span class="text-muted">(optional)</span></label>
+                        <input name="purchaseSettlementDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-6" id="purchaseDueDateField" hidden>
+                        <label class="form-label">Payment due date <span class="text-muted">(optional)</span></label>
+                        <input name="purchaseDueDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-6" id="saleSettlementDateField">
+                        <label class="form-label">Sale settlement date <span class="text-muted">(optional)</span></label>
+                        <input name="saleSettlementDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-6" id="saleDueDateField">
+                        <label class="form-label">Payment due date <span class="text-muted">(optional)</span></label>
+                        <input name="saleDueDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-6" id="commissionField">
+                        <label class="form-label">Commission</label>
+                        <input name="commission" type="number" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                    <div class="col-6" id="paidCommissionField">
+                        <label class="form-label">Paid commission</label>
+                        <input name="paidCommission" type="number" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Warehouse</label>
+                        <select name="warehouseId" id="warehouseSel" class="form-select" required>
+                            {{#each warehouses}}
+                            <option value="{{id}}">{{warehouse_name}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Shelf</label>
+                        <select name="shelfId" id="shelfSel" class="form-select" required>
+                            {{#each shelves}}
+                            <option value="{{id}}" data-warehouse="{{warehouse_id}}">{{shelf_code}}</option>
+                            {{/each}}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes <span style="font-weight:400;color:var(--color-muted);">(optional)</span></label>
+                        <input name="notes" class="form-control" placeholder="Add a note…">
+                    </div>
+                    <div class="col-12">
+                        <div class="alert alert-info py-2 mb-0" style="font-size:12px;">
+                            Journal fields including stock remaining, brand, serial number, totals, balances, payment status, and profit are linked and calculated automatically.
+                            <span id="paymentStatusPreview" class="fw-semibold"></span>
+                        </div>
+                    </div>
+
+                    <!-- ── Selected-method cost preview (shown for SELL) ── -->
+                    <div class="col-12" id="costPanel">
+                        <div class="cost-panel">
+                            <div id="costDataNotice" class="alert alert-warning py-2 px-3" hidden></div>
+                            <div class="cost-panel-title">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-1px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                                <span id="costPanelMethodTitle">WAC sale estimate</span>
+                            </div>
+                            <div class="cost-row">
+                                <span class="cost-row-label" id="cpUnitCostLabel">Average cost / unit (WAC)</span>
+                                <span class="cost-row-value" id="cpAvgCost">—</span>
+                            </div>
+                            <div class="cost-row">
+                                <span class="cost-row-label">Markup</span>
+                                <span class="cost-row-value" id="cpMarkup">—</span>
+                            </div>
+                            <div class="cost-row">
+                                <span class="cost-row-label">Suggested price / unit</span>
+                                <span class="cost-row-value primary" id="cpSuggestedUnit">—</span>
+                            </div>
+                            <div class="cost-row">
+                                <span class="cost-row-label">Suggested price × qty</span>
+                                <span class="cost-row-value primary" id="cpSuggestedTotal">—</span>
+                            </div>
+                            <div class="cost-row">
+                                <span class="cost-row-label">Est. COGS (this sale)</span>
+                                <span class="cost-row-value" id="cpCogs">—</span>
+                            </div>
+                            <div class="cost-row">
+                                <span class="cost-row-label">Est. gross profit</span>
+                                <span class="cost-row-value success" id="cpProfit">—</span>
+                            </div>
+                            <div class="margin-bar-wrap">
+                                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-muted);margin-bottom:4px;">
+                                    <span>Gross margin</span>
+                                    <span id="cpMarginPct">—</span>
+                                </div>
+                                <div class="margin-bar-bg">
+                                    <div class="margin-bar-fill" id="cpMarginBar" style="width:0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 pt-1">
+                        <button class="btn btn-primary w-100" type="submit">Record transaction</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Transaction history ──────────────────────────── -->
+    <div class="col-xl-8">
+        <div class="section-panel">
+            <div class="section-panel-header">
+                <div>
+                    <h3 class="section-panel-title">Transaction history</h3>
+                    <p class="section-panel-subtitle">Last 100 records · each new sale uses exactly one selected costing method; older records may show both legacy values.</p>
+                </div>
+                <span class="badge badge-neutral">Last 100</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Item</th>
+                            <th>Warehouse</th>
+                            <th>Shelf</th>
+                            <th>Type</th>
+                            <th>Qty</th>
+                            <th>Costing method</th>
+                            <th>WAC unit cost</th>
+                            <th>Selected COGS</th>
+                            <th>FIFO layers used</th>
+                            <th>Reference</th>
+                            <th>Invoice</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#each transactions}}
+                        <tr>
+                            <td style="font-size:12px;color:var(--color-muted);">{{created_at}}</td>
+                            <td class="fw-semibold">{{item_name}}</td>
+                            <td class="text-muted">{{warehouse_name}}</td>
+                            <td class="text-muted">{{shelf_code}}</td>
+                            <td>
+                                <span class="badge {{#if (eq transaction_type 'IN')}}badge-in{{else}}badge-out{{/if}}">
+                                    {{transaction_type}}
+                                </span>
+                            </td>
+                            <td>{{quantity}}</td>
+                            <td>
+                                {{#if costing_method}}
+                                <span class="badge {{#if (eq costing_method 'FIFO')}}badge-neutral{{else}}badge-received{{/if}}">{{costing_method}}</span>
+                                {{else}}
+                                {{#if (eq transaction_type 'OUT')}}<span class="badge badge-neutral">Legacy · both</span>{{else}}—{{/if}}
+                                {{/if}}
+                            </td>
+                            <td class="text-muted">
+                                {{#if unit_cost}}{{unit_cost}}{{else}}<span style="color:#cbd5e1;">—</span>{{/if}}
+                            </td>
+                            <td>
+                                {{#if (eq costing_method 'WAC')}}
+                                <span class="fw-semibold" style="color:var(--color-danger);">{{cogs}}</span>
+                                {{else if (eq costing_method 'FIFO')}}
+                                <span class="fw-semibold" style="color:#7c3aed;">{{fifo_cogs}}</span>
+                                {{else}}
+                                {{#if (eq transaction_type 'OUT')}}
+                                <small class="text-muted">WAC {{cogs}} · FIFO {{fifo_cogs}}</small>
+                                {{else}}—{{/if}}
+                                {{/if}}
+                            </td>
+                            <td style="font-size:11px;color:var(--color-muted);max-width:180px;">{{fifo_layers}}</td>
+                            <td><span class="ref-mono">{{reference_number}}</span></td>
+                            <td>
+                                {{#if (eq transaction_type 'OUT')}}
+                                <a class="btn btn-sm btn-outline-primary" href="/invoice/{{id}}" target="_blank">Print</a>
+                                {{else}}—{{/if}}
+                            </td>
+                        </tr>
+                        {{else}}
+                        <tr><td colspan="12">
+                            <div class="empty-state">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                <p>No transactions recorded yet.</p>
+                            </div>
+                        </td></tr>
+                        {{/each}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const form = document.getElementById('transactionForm')
+const message = document.getElementById('message')
+const warehouseSel = document.getElementById('warehouseSel')
+const shelfSel = document.getElementById('shelfSel')
+const txnType = document.getElementById('txnType')
+const txnItem = document.getElementById('txnItem')
+const txnQty  = document.getElementById('txnQty')
+const salePrice = document.getElementById('salePrice')
+const purchaseUnitCost = document.getElementById('purchaseUnitCost')
+const returnUnitCost = document.getElementById('returnUnitCost')
+const productionDate = document.getElementById('productionDate')
+const counterpartyLabel = document.getElementById('counterpartyLabel')
+const counterpartyName = document.getElementById('counterpartyName')
+const amountPaidInput = form.elements.amountPaid
+const settlementDateFields = {
+    purchase: document.getElementById('purchaseSettlementDateField'),
+    sale: document.getElementById('saleSettlementDateField')
+}
+const dueDateFields = {
+    purchase: document.getElementById('purchaseDueDateField'),
+    sale: document.getElementById('saleDueDateField')
+}
+const costPanel = document.getElementById('costPanel')
+const costingMethod = document.getElementById('costingMethod')
+const costingMethodField = document.getElementById('costingMethodField')
+const stockAlert = document.getElementById('stockAlert')
+const qtyAvailableText = document.getElementById('qtyAvailableText')
+const submitBtn = form.querySelector('button[type="submit"]')
+
+let inventoryStock = []
+try {
+    const raw = document.getElementById('inventory-stock-data')?.textContent?.trim()
+    if (raw && raw !== 'undefined' && raw !== 'null') inventoryStock = JSON.parse(raw)
+} catch (e) {
+    console.error('Error parsing inventory stock data:', e)
+}
+
+let fifoLayers = []
+try {
+    const raw = document.getElementById('fifo-layers-data')?.textContent?.trim()
+    if (raw && raw !== 'undefined' && raw !== 'null') fifoLayers = JSON.parse(raw)
+} catch (e) {
+    console.error('Error parsing FIFO cost layers:', e)
+}
+
+let allWarehouses = []
+try {
+    const raw = document.getElementById('all-warehouses-data')?.textContent?.trim()
+    if (raw && raw !== 'undefined' && raw !== 'null') allWarehouses = JSON.parse(raw)
+} catch (e) {}
+
+let allShelves = []
+try {
+    const raw = document.getElementById('all-shelves-data')?.textContent?.trim()
+    if (raw && raw !== 'undefined' && raw !== 'null') allShelves = JSON.parse(raw)
+} catch (e) {}
+
+// If inventoryStock is empty on load, fetch from API immediately
+if (!inventoryStock || inventoryStock.length === 0) {
+    fetch('/api/inventory/stock')
+        .then(r => r.json())
+        .then(data => {
+            if (Array.isArray(data) && data.length > 0) {
+                inventoryStock = data
+                updateLocations()
+            }
+        })
+        .catch(console.warn)
+}
+
+// ── Dynamic Location Filtering (Warehouse & Shelf) ──────
+function updateLocations() {
+    const isSell = txnType.value === 'SELL'
+    const itemId = Number(txnItem.value)
+
+    if (isSell) {
+        // Filter stock for this specific item with available quantity > 0
+        const itemStock = inventoryStock.filter(s => Number(s.item_id) === itemId && Number(s.quantity) > 0)
+
+        if (itemStock.length === 0) {
+            stockAlert.style.display = 'block'
+            warehouseSel.innerHTML = '<option value="">No stock in any warehouse</option>'
+            shelfSel.innerHTML = '<option value="">No shelf available</option>'
+            warehouseSel.disabled = true
+            shelfSel.disabled = true
+            txnQty.disabled = true
+            txnQty.removeAttribute('max')
+            qtyAvailableText.textContent = '⚠️ Out of stock (0 units available)'
+            qtyAvailableText.style.color = 'var(--color-danger)'
+            submitBtn.disabled = true
+            return
+        }
+
+        stockAlert.style.display = 'none'
+        warehouseSel.disabled = false
+        shelfSel.disabled = false
+        txnQty.disabled = false
+        submitBtn.disabled = false
+
+        // Group available stock by warehouse
+        const whMap = new Map()
+        itemStock.forEach(s => {
+            const whId = Number(s.warehouse_id)
+            const current = whMap.get(whId) || { id: whId, name: s.warehouse_name, qty: 0 }
+            current.qty += Number(s.quantity)
+            whMap.set(whId, current)
+        })
+
+        const prevWh = Number(warehouseSel.value)
+        warehouseSel.innerHTML = Array.from(whMap.values()).map(wh =>
+            `<option value="${wh.id}">${wh.name} (${wh.qty} available)</option>`
+        ).join('')
+
+        if (whMap.has(prevWh)) {
+            warehouseSel.value = prevWh
+        } else {
+            warehouseSel.selectedIndex = 0
+        }
+
+        updateShelvesForSell(itemStock)
+    } else {
+        // BUY / RETURN: Stock comes IN — can be received into any warehouse and shelf
+        stockAlert.style.display = 'none'
+        warehouseSel.disabled = false
+        shelfSel.disabled = false
+        txnQty.disabled = false
+        txnQty.removeAttribute('max')
+        submitBtn.disabled = false
+        qtyAvailableText.textContent = 'Stock will be placed in this location'
+        qtyAvailableText.style.color = 'var(--color-muted)'
+
+        const prevWh = Number(warehouseSel.value)
+        warehouseSel.innerHTML = allWarehouses.map(wh =>
+            `<option value="${wh.id}">${wh.warehouse_name}</option>`
+        ).join('')
+
+        if (allWarehouses.some(wh => Number(wh.id) === prevWh)) {
+            warehouseSel.value = prevWh
+        } else {
+            warehouseSel.selectedIndex = 0
+        }
+
+        updateShelvesForBuy()
+    }
+}
+
+function updateShelvesForSell(itemStock) {
+    if (!itemStock) {
+        const itemId = Number(txnItem.value)
+        itemStock = inventoryStock.filter(s => Number(s.item_id) === itemId && Number(s.quantity) > 0)
+    }
+    const selectedWhId = Number(warehouseSel.value)
+    const shelvesForWh = itemStock.filter(s => Number(s.warehouse_id) === selectedWhId)
+
+    if (shelvesForWh.length === 0) {
+        shelfSel.innerHTML = '<option value="">No shelf with stock</option>'
+        shelfSel.disabled = true
+        txnQty.removeAttribute('max')
+        qtyAvailableText.textContent = '⚠️ No stock on shelves in this warehouse'
+        qtyAvailableText.style.color = 'var(--color-danger)'
+        submitBtn.disabled = true
+        return
+    }
+
+    shelfSel.disabled = false
+    const prevShelf = Number(shelfSel.value)
+    shelfSel.innerHTML = shelvesForWh.map(sh =>
+        `<option value="${sh.shelf_id}">${sh.shelf_code} (${Number(sh.quantity)} in stock)</option>`
+    ).join('')
+
+    if (shelvesForWh.some(sh => Number(sh.shelf_id) === prevShelf)) {
+        shelfSel.value = prevShelf
+    } else {
+        shelfSel.selectedIndex = 0
+    }
+
+    checkShelfStockLimit()
+}
+
+function updateShelvesForBuy() {
+    const selectedWhId = Number(warehouseSel.value)
+    const shelvesForWh = allShelves.filter(s => Number(s.warehouse_id) === selectedWhId)
+    if (shelvesForWh.length === 0) {
+        shelfSel.innerHTML = '<option value="">No shelf in this warehouse</option>'
+        shelfSel.disabled = true
+        submitBtn.disabled = true
+        return
+    }
+    shelfSel.disabled = false
+    submitBtn.disabled = false
+    const prevShelf = Number(shelfSel.value)
+    shelfSel.innerHTML = shelvesForWh.map(sh =>
+        `<option value="${sh.id}">${sh.shelf_code}</option>`
+    ).join('')
+
+    if (shelvesForWh.some(sh => Number(sh.id) === prevShelf)) {
+        shelfSel.value = prevShelf
+    } else {
+        shelfSel.selectedIndex = 0
+    }
+}
+
+function checkShelfStockLimit() {
+    if (txnType.value !== 'SELL') return
+    const selectedShelfId = Number(shelfSel.value)
+    const itemId = Number(txnItem.value)
+    const stockRow = inventoryStock.find(s => Number(s.item_id) === itemId && Number(s.shelf_id) === selectedShelfId)
+    const available = stockRow ? Number(stockRow.quantity) : 0
+
+    txnQty.max = available
+    const entered = Number(txnQty.value) || 0
+
+    if (entered > available && entered > 0) {
+        qtyAvailableText.textContent = `⚠️ Exceeds available stock (${available} max)`
+        qtyAvailableText.style.color = 'var(--color-danger)'
+        submitBtn.disabled = true
+    } else if (available > 0) {
+        qtyAvailableText.textContent = `✓ ${available} units available on this shelf`
+        qtyAvailableText.style.color = 'var(--color-success)'
+        submitBtn.disabled = false
+    } else {
+        qtyAvailableText.textContent = `⚠️ 0 units available on this shelf`
+        qtyAvailableText.style.color = 'var(--color-danger)'
+        submitBtn.disabled = true
+    }
+}
+
+warehouseSel.addEventListener('change', () => {
+    if (txnType.value === 'SELL') {
+        updateShelvesForSell()
+    } else {
+        updateShelvesForBuy()
+    }
+})
+
+shelfSel.addEventListener('change', () => {
+    if (txnType.value === 'SELL') checkShelfStockLimit()
+})
+
+// ── Cost panel ──────────────────────────────────────────
+const workspaceNumberLocale = {{{json workspacePreferences.language_code}}} === 'id' ? 'id-ID' : 'en-US'
+function fmt(n) { return Number(n).toLocaleString(workspaceNumberLocale, {minimumFractionDigits: 2, maximumFractionDigits: 4}) }
+
+function updateCostPanel() {
+    const isSell = txnType.value === 'SELL'
+    costPanel.hidden = !isSell
+    costingMethodField.hidden = !isSell
+    if (!isSell) return
+
+    const itemId = Number(txnItem.value)
+    const qty = Math.max(0, Number(txnQty.value) || 0)
+    const cost = ITEM_COSTS[itemId] || {avg_cost: 0, markup_pct: 30, suggested_price: 0}
+    const markup        = Number(cost.markup_pct)
+    const method = costingMethod.value
+    const selectedLayers = fifoLayers.filter(layer =>
+        Number(layer.item_id) === itemId
+        && Number(layer.warehouse_id) === Number(warehouseSel.value)
+        && Number(layer.shelf_id) === Number(shelfSel.value)
+    )
+    let remainingQty = qty
+    let fifoCogs = 0
+    for (const layer of selectedLayers) {
+        if (remainingQty <= 0) break
+        const usedQty = Math.min(remainingQty, Number(layer.remaining_quantity))
+        fifoCogs += usedQty * Number(layer.unit_cost)
+        remainingQty -= usedQty
+    }
+    const fifoCovered = remainingQty <= 0.000001
+    const methodUnitCost = method === 'WAC'
+        ? Number(cost.avg_cost)
+        : qty > 0 && fifoCovered
+            ? fifoCogs / qty
+            : Number(selectedLayers[0]?.unit_cost || 0)
+    const suggestedUnit = methodUnitCost * (1 + markup / 100)
+    const previousSuggested = Number(salePrice.dataset.suggestedPrice)
+    if ((!salePrice.value || Number(salePrice.value) === previousSuggested) && suggestedUnit > 0) {
+        salePrice.value = suggestedUnit.toFixed(2)
+        salePrice.dataset.suggestedPrice = String(Number(salePrice.value))
+    }
+    const actualUnit = Number(salePrice.value) || 0
+    const suggestedTotal = actualUnit * qty
+    const cogsVal = method === 'WAC' ? methodUnitCost * qty : fifoCovered ? fifoCogs : 0
+    const profit         = suggestedTotal - cogsVal
+    const marginPct      = suggestedTotal > 0 ? (profit / suggestedTotal * 100) : 0
+
+    const hasCost = method === 'WAC' ? Number(cost.avg_cost) > 0 : fifoCovered && fifoCogs > 0
+    document.getElementById('costPanelMethodTitle').textContent = method === 'WAC'
+        ? 'WAC sale estimate · weighted average cost'
+        : 'FIFO sale estimate · oldest receipt layers first'
+    document.getElementById('cpUnitCostLabel').textContent = method === 'WAC'
+        ? 'Average cost / unit (WAC)'
+        : 'Effective unit cost (FIFO layers)'
+    document.getElementById('cpAvgCost').textContent = methodUnitCost > 0 ? fmt(methodUnitCost) : '—'
+    const costDataNotice = document.getElementById('costDataNotice')
+    costDataNotice.hidden = hasCost
+    costDataNotice.textContent = method === 'WAC'
+        ? hasCost ? '' : 'No WAC purchase cost is recorded for this item. Record the actual purchase or return cost to calculate WAC COGS.'
+        : !fifoCovered
+            ? 'FIFO receipt layers do not cover this sale quantity. Record the missing stock cost/layers before selling with FIFO.'
+            : hasCost ? '' : 'The selected FIFO layers have zero cost. Record the actual receipt cost to calculate FIFO COGS.'
+    document.getElementById('cpMarkup').textContent        = markup + '%'
+    document.getElementById('cpSuggestedUnit').textContent = actualUnit ? fmt(actualUnit) : '—'
+    document.getElementById('cpSuggestedTotal').textContent = qty && actualUnit ? fmt(suggestedTotal) : '—'
+    document.getElementById('cpCogs').textContent          = qty && hasCost && fifoCovered ? fmt(cogsVal) : '—'
+    document.getElementById('cpProfit').textContent        = qty && hasCost && fifoCovered ? fmt(profit) : '—'
+    document.getElementById('cpMarginPct').textContent     = qty && hasCost && fifoCovered ? marginPct.toFixed(1) + '%' : '—'
+    document.getElementById('cpMarginBar').style.width     = Math.min(100, Math.max(0, marginPct)).toFixed(1) + '%'
+}
+
+function updateTransactionMode() {
+    const isPurchase = txnType.value === 'PURCHASE'
+    const isSale = txnType.value === 'SELL'
+    const isReturn = txnType.value === 'BUY'
+    counterpartyLabel.textContent = isPurchase ? 'Supplier name' : 'Customer name'
+    counterpartyName.placeholder = isPurchase ? 'Enter supplier name' : 'Enter customer name'
+    document.getElementById('purchaseCostField').hidden = !isPurchase
+    document.getElementById('returnCostField').hidden = !isReturn
+    document.getElementById('productionDateField').hidden = !isPurchase
+    document.getElementById('taxField').hidden = !isSale
+    document.getElementById('discountField').hidden = !isSale
+    document.getElementById('commissionField').hidden = !isSale
+    document.getElementById('paidCommissionField').hidden = !isSale
+    settlementDateFields.purchase.hidden = !isPurchase && !isReturn
+    settlementDateFields.sale.hidden = !isSale
+    dueDateFields.purchase.hidden = !isPurchase && !isReturn
+    dueDateFields.sale.hidden = !isSale
+    purchaseUnitCost.required = isPurchase
+    returnUnitCost.required = isReturn
+    productionDate.required = isPurchase
+    salePrice.required = isSale
+    salePrice.closest('.col-6').hidden = !isSale
+    costPanel.hidden = !isSale
+    costingMethodField.hidden = !isSale
+    document.querySelectorAll('[data-transaction-mode]').forEach((button) => {
+        const active = button.dataset.transactionMode === txnType.value
+        button.classList.toggle('active', active)
+        button.setAttribute('aria-pressed', String(active))
+    })
+    updatePaymentStatusPreview()
+}
+
+function updatePaymentStatusPreview() {
+    const isPurchase = txnType.value === 'PURCHASE'
+    const isReturn = txnType.value === 'BUY'
+    const isSale = txnType.value === 'SELL'
+    const qty = Number(txnQty.value) || 0
+    const unitPrice = isPurchase
+        ? Number(purchaseUnitCost.value) || 0
+        : isReturn
+            ? Number(returnUnitCost.value) || 0
+            : Number(salePrice.value) || 0
+    const discount = isSale ? Number(form.elements.discountAmount.value) || 0 : 0
+    const taxRate = isSale ? Number(form.elements.taxPct.value) || 0 : 0
+    const subtotal = qty * unitPrice
+    const total = isSale ? Math.max(0, subtotal - discount) * (1 + taxRate / 100) : subtotal
+    const paid = Number(amountPaidInput.value) || 0
+    const status = total <= 0
+        ? 'Enter quantity and price to calculate payment status.'
+        : paid <= 0
+            ? 'Payment status: Unpaid'
+            : paid >= total
+                ? 'Payment status: Paid'
+                : 'Payment status: Partially paid'
+    document.getElementById('paymentStatusPreview').textContent = ` ${status}`
+}
+
+txnType.addEventListener('change', () => {
+    updateTransactionMode()
+    updateLocations()
+    updateCostPanel()
+})
+document.querySelectorAll('[data-transaction-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+        txnType.value = button.dataset.transactionMode
+        txnType.dispatchEvent(new Event('change'))
+    })
+})
+document.querySelectorAll('[data-costing-method]').forEach((button) => {
+    button.addEventListener('click', () => {
+        costingMethod.value = button.dataset.costingMethod
+        document.querySelectorAll('[data-costing-method]').forEach((choice) => {
+            const active = choice === button
+            choice.classList.toggle('active', active)
+            choice.setAttribute('aria-pressed', String(active))
+        })
+        updateCostPanel()
+    })
+})
+txnItem.addEventListener('change', () => {
+    updateLocations()
+    updateCostPanel()
+})
+warehouseSel.addEventListener('change', updateCostPanel)
+shelfSel.addEventListener('change', updateCostPanel)
+txnQty.addEventListener('input', () => {
+    checkShelfStockLimit()
+    updateCostPanel()
+    updatePaymentStatusPreview()
+})
+salePrice.addEventListener('input', () => {
+    delete salePrice.dataset.suggestedPrice
+    updateCostPanel()
+})
+;[purchaseUnitCost, returnUnitCost, amountPaidInput, form.elements.taxPct, form.elements.discountAmount]
+    .forEach((input) => input.addEventListener('input', updatePaymentStatusPreview))
+
+// Initialize locations and cost panel on page load
+updateTransactionMode()
+updateLocations()
+updateCostPanel()
+
+// ── Submit ──────────────────────────────────────────────
+form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    try {
+        const response = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+            body: JSON.stringify(Object.fromEntries(new FormData(form)))
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error)
+        message.className = 'alert alert-success'
+        message.textContent = result.message
+        setTimeout(() => location.reload(), 600)
+    } catch (error) {
+        message.className = 'alert alert-danger'
+        message.textContent = error.message
+    }
+})
+</script>

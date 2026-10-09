@@ -1,0 +1,386 @@
+
+
+<style>   
+    .journal-form-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(170px, 1fr));
+        gap: 1rem;
+    }
+    .journal-report-wrap {
+        overflow-x: auto;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+    }
+    .journal-table {
+        min-width: 3000px;
+        white-space: nowrap;
+        font-size: 12px;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .journal-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #e8edf3;
+        color: #172033;
+        font-size: 11px;
+        text-transform: none;
+        border: 1px solid #334155;
+        font-weight: 700;
+    }
+    .journal-table td { border: 1px solid #64748b; padding: 8px 9px; vertical-align: top; }
+    .journal-table .journal-group-row th {
+        background: #1e293b;
+        color: #fff;
+        text-align: center;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .journal-tools { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
+    .journal-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.75rem; margin-bottom:1rem; }
+    .journal-summary-card { border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:.8rem 1rem; }
+    .journal-summary-label { color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; }
+    .journal-summary-value { font-size:1.15rem; font-weight:800; color:#0f172a; margin-top:3px; }
+    @media (max-width: 1100px) {
+        .journal-form-grid { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+        .journal-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+    @media print {
+        @page { size: landscape; margin: 8mm; }
+        body { background: #fff !important; }
+        .sidebar, .topbar, .mobile-header, .no-print, .page-header a,
+        .journal-entry-panel, .journal-payment-panel, .journal-summary { display: none !important; }
+        .main-content { margin-left: 0 !important; }
+        .content-wrap { max-width: none !important; padding: 0 !important; }
+        .journal-report-wrap { overflow: visible; border: 0; }
+        .journal-table { min-width: 0; width: 100%; font-size: 7px; }
+        .journal-table thead { display: table-header-group; }
+        .journal-table tr { break-inside: avoid; }
+        .journal-table th { position: static; }
+        .journal-table td, .journal-table th { padding: 3px 2px; border: 1px solid #333; }
+        .journal-table .journal-group-row th { background: #dbe2ea !important; color:#111 !important; }
+        .section-panel, .section-panel-header { border:0 !important; box-shadow:none !important; }
+    }
+</style>
+
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Finance</p>
+        <h1 class="page-title">Financial journal</h1>
+        <p class="page-subtitle">Spreadsheet-style financial ledger linked to purchases, sales, settlements, and profit. Currency: Indonesian rupiah (compact display).</p>
+    </div>
+    <div class="journal-tools no-print">
+        <a href="/financial-journal/download.csv" class="btn btn-outline-primary">Download CSV</a>
+        <button id="toggleJournalEntry" type="button" class="btn btn-primary">Add journal entry</button>
+        <button type="button" class="btn btn-outline-primary" onclick="window.print()">Print journal</button>
+    </div>
+</div>
+
+<div id="journalMessage" class="alert d-none mb-4 no-print" role="alert"></div>
+
+<div class="journal-summary">
+    <div class="journal-summary-card"><div class="journal-summary-label">Journal entries</div><div class="journal-summary-value">{{summary.entry_count}}</div></div>
+    <div class="journal-summary-card"><div class="journal-summary-label">Current stock (kg)</div><div class="journal-summary-value">{{number stockSummary.total_stock 4}}</div></div>
+    <div class="journal-summary-card"><div class="journal-summary-label">Total purchases</div><div class="journal-summary-value">{{rupiahExact summary.total_purchases}}</div></div>
+    <div class="journal-summary-card"><div class="journal-summary-label">Total sales</div><div class="journal-summary-value">{{rupiahExact summary.total_sales}}</div></div>
+    <div class="journal-summary-card"><div class="journal-summary-label">Total profit</div><div class="journal-summary-value">{{rupiahExact summary.total_profit}}</div></div>
+</div>
+
+<div class="op-card journal-entry-panel mb-4" id="journalEntryPanel" hidden>
+    <div class="op-card-header"><h3 class="op-card-title">New journal entry</h3></div>
+    <div class="op-card-body">
+        <form id="journalForm">
+            <div class="journal-form-grid">
+                <div><label class="form-label">order_date *</label><input name="order_date" type="date" class="form-control" required></div>
+                <div><label class="form-label">number *</label><input name="number" class="form-control" required></div>
+                <div>
+                    <label class="form-label">type *</label>
+                    <select name="type" class="form-select" required>
+                        <option value="">Choose type…</option>
+                        <option value="PURCHASE">Purchase</option>
+                        <option value="SALE">Sale</option>
+                        <option value="CUSTOMER_RETURN">Customer return</option>
+                        <option value="ADJUSTMENT">Adjustment</option>
+                        <option value="TRANSFER">Transfer</option>
+                    </select>
+                </div>
+                <div><label class="form-label">name *</label><input name="name" class="form-control" required></div>
+                <div><label class="form-label">quantity_kg (kg, +/-)</label><input name="quantity_kg" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">stock_remaining (kg)</label><input name="stock_remaining" type="number" step="0.0001" class="form-control"></div>
+                <div>
+                    <label class="form-label">brand</label>
+                    <select name="brand" class="form-select">
+                        <option value="">Choose brand…</option>
+                        {{#each brands}}<option value="{{brand_name}}">{{brand_name}}</option>{{/each}}
+                    </select>
+                </div>
+                <div><label class="form-label">serial_number</label><input name="serial_number" class="form-control"></div>
+                <div>
+                    <label class="form-label">item (for stock-linked entries)</label>
+                    <select name="item_id" class="form-select">
+                        <option value="">Not linked to stock</option>
+                        {{#each items}}<option value="{{id}}">{{item_name}} — {{brand_name}} ({{item_code}})</option>{{/each}}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">warehouse</label>
+                    <select name="warehouse_id" class="form-select">
+                        <option value="">Not linked to stock</option>
+                        {{#each warehouses}}<option value="{{id}}">{{warehouse_name}}</option>{{/each}}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">shelf</label>
+                    <select name="shelf_id" class="form-select">
+                        <option value="">Not linked to stock</option>
+                        {{#each shelves}}<option value="{{id}}" data-warehouse="{{warehouse_id}}">{{shelf_code}}</option>{{/each}}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">costing method</label>
+                    <select name="costing_method" class="form-select">
+                        <option value="WAC">WAC</option>
+                        <option value="FIFO">FIFO</option>
+                    </select>
+                </div>
+                <div><label class="form-label">adjustment ({{workspacePreferences.currency_code}})</label><input name="adjustment" type="number" step="0.001" class="form-control"></div>
+                <div><label class="form-label">purchase_price_per_unit ({{workspacePreferences.currency_code}})</label><input name="purchase_price_per_unit" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">total_purchase_price ({{workspacePreferences.currency_code}})</label><input name="total_purchase_price" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">purchase_settlement_date</label><input name="purchase_settlement_date" type="date" class="form-control"></div>
+                <div><label class="form-label">purchase_due_date</label><input name="purchase_due_date" type="date" class="form-control"></div>
+                <div><label class="form-label">remaining_debt ({{workspacePreferences.currency_code}})</label><input name="remaining_debt" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">selling_price_per_unit ({{workspacePreferences.currency_code}})</label><input name="selling_price_per_unit" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">total_selling_price ({{workspacePreferences.currency_code}})</label><input name="total_selling_price" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">sale_settlement_date</label><input name="sale_settlement_date" type="date" class="form-control"></div>
+                <div><label class="form-label">sale_due_date</label><input name="sale_due_date" type="date" class="form-control"></div>
+                <div>
+                    <label class="form-label">payment_status</label>
+                    <select name="payment_status" class="form-select">
+                        <option value="">Choose status…</option>
+                        <option value="Not recorded">Not recorded</option>
+                        <option value="Not applicable">Not applicable</option>
+                        <option value="Unpaid">Unpaid</option>
+                        <option value="Partially paid">Partially paid</option>
+                        <option value="Paid">Paid</option>
+                    </select>
+                </div>
+                <div><label class="form-label">remaining_receivables ({{workspacePreferences.currency_code}})</label><input name="remaining_receivables" type="number" step="0.0001" class="form-control"></div>
+                <div>
+                    <label class="form-label">paid_status</label>
+                    <select name="paid_status" class="form-select">
+                        <option value="">Choose status…</option>
+                        <option value="Not recorded">Not recorded</option>
+                        <option value="Not applicable">Not applicable</option>
+                        <option value="Unpaid">Unpaid</option>
+                        <option value="Partially paid">Partially paid</option>
+                        <option value="Paid">Paid</option>
+                    </select>
+                </div>
+                <div><label class="form-label">commission ({{workspacePreferences.currency_code}})</label><input name="commission" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">paid_commission ({{workspacePreferences.currency_code}})</label><input name="paid_commission" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">profit ({{workspacePreferences.currency_code}})</label><input name="profit" type="number" step="0.0001" class="form-control"></div>
+                <div><label class="form-label">paid_to</label><input name="paid_to" class="form-control"></div>
+                <div style="grid-column: 1 / -1"><label class="form-label">notes</label><textarea name="notes" class="form-control" rows="2"></textarea></div>
+            </div>
+            <button class="btn btn-primary mt-4" type="submit">Save journal entry</button>
+        </form>
+    </div>
+</div>
+
+<div class="op-card journal-payment-panel mb-4 no-print">
+    <div class="op-card-header"><h3 class="op-card-title">Record payment or collection</h3></div>
+    <div class="op-card-body">
+        <p class="text-muted" style="font-size:12px;">Record an amount against an unpaid purchase or sale. The remaining debt/receivable and both status columns update together.</p>
+        {{#if paymentEntries.length}}
+        <form id="journalPaymentForm" class="row g-3 align-items-end">
+            <div class="col-lg-5">
+                <label class="form-label" for="paymentEntry">Journal entry</label>
+                <select id="paymentEntry" name="journalId" class="form-select" required>
+                    <option value="">Choose an open balance…</option>
+                    {{#each paymentEntries}}
+                    <option value="{{id}}" data-outstanding="{{outstanding_amount}}">
+                        {{this.number}} · {{type}} · {{name}} · outstanding {{rupiahExact outstanding_amount}}
+                    </option>
+                    {{/each}}
+                </select>
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label" for="paymentAmount">Amount paid / received ({{workspacePreferences.currency_code}})</label>
+                <input id="paymentAmount" name="amountPaid" type="number" min="0.01" step="0.0001" class="form-control" required>
+                <div id="paymentBalance" class="form-text">Select an entry to see its balance.</div>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label" for="paymentDate">Settlement date</label>
+                <input id="paymentDate" name="settlementDate" type="date" class="form-control">
+            </div>
+            <div class="col-lg-2">
+                <button class="btn btn-success w-100" type="submit">Update status</button>
+            </div>
+        </form>
+        {{else}}
+        <div class="alert alert-success mb-0">There are no outstanding purchase or sale balances to settle.</div>
+        {{/if}}
+    </div>
+</div>
+
+<div class="section-panel">
+    <div class="section-panel-header">
+        <div><h2 class="section-panel-title">Financial journal</h2><p class="section-panel-subtitle">{{entries.length}} entries · complete journal fields</p></div>
+        <div class="journal-tools no-print">
+            <input id="journalSearch" class="form-control" type="search" placeholder="Search journal…" aria-label="Search journal entries">
+            <span class="badge badge-neutral">{{entries.length}} entries</span>
+        </div>
+    </div>
+    <div class="journal-report-wrap">
+        <table class="table table-hover mb-0 journal-table">
+            <thead>
+            <tr class="journal-group-row">
+                <th colspan="4">Order details</th>
+                <th colspan="7">Stock movement</th>
+                <th colspan="6">Purchase / payable</th>
+                <th colspan="6">Sale / receivable</th>
+                <th colspan="8">Settlement, commission and notes</th>
+            </tr>
+            <tr>
+                <th>order_date</th><th>number</th><th>type</th><th>name</th>
+                <th>quantity_in_kg (+)</th><th>quantity_out_kg (-)</th><th>quantity_kg net</th><th>stock_remaining</th><th>brand</th><th>serial_number</th><th>adjustment</th>
+                <th>purchase_price_per_unit</th><th>total_purchase_price</th><th>purchase_amount_paid</th><th>purchase_settlement_date</th><th>purchase_due_date</th><th>remaining_debt</th>
+                <th>selling_price_per_unit</th><th>total_selling_price</th><th>sale_amount_received</th><th>sale_settlement_date</th><th>sale_due_date</th><th>remaining_receivables</th>
+                <th>payment_status</th><th>paid_status</th><th>commission</th><th>commission_paid_status</th><th>paid_commission</th><th>profit</th><th>paid_to</th><th>notes</th>
+            </tr>
+            </thead>
+            <tbody>
+                {{#each entries}}
+                <tr data-journal-row>
+                    <td>{{order_date}}</td><td>{{this.number}}</td><td>{{type}}</td><td>{{name}}</td>
+                    <td>{{quantity_in_kg}}</td><td>{{quantity_out_kg}}</td><td>{{quantity_kg}}</td><td>{{stock_remaining}}</td><td>{{brand}}</td><td>{{serial_number}}</td><td>{{rupiahExact adjustment}}</td>
+                    <td>{{rupiahExact purchase_price_per_unit}}</td><td>{{rupiahExact total_purchase_price}}</td><td>{{rupiahExact purchase_amount_paid}}</td><td>{{purchase_settlement_date}}</td><td>{{purchase_due_date}}</td><td>{{rupiahExact remaining_debt}}</td>
+                    <td>{{rupiahExact selling_price_per_unit}}</td><td>{{rupiahExact total_selling_price}}</td><td>{{rupiahExact sale_amount_received}}</td><td>{{sale_settlement_date}}</td><td>{{sale_due_date}}</td><td>{{rupiahExact remaining_receivables}}</td>
+                    <td>{{payment_status}}</td><td>{{paid_status}}</td><td>{{rupiahExact commission}}</td><td>{{commission_paid_status}}</td><td>{{rupiahExact paid_commission}}</td><td>{{rupiahExact profit}}</td><td>{{paid_to}}</td><td>{{notes}}</td>
+                </tr>
+                {{else}}
+                <tr><td colspan="31"><div class="empty-state">No journal entries yet.</div></td></tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{#each sourceSummaries}}
+<div class="section-panel mt-4 journal-source-summary">
+    <div class="section-panel-header">
+        <div><h2 class="section-panel-title">Source journal totals · {{source_id}}</h2><p class="section-panel-subtitle">{{row_count}} imported rows · closing figures as of {{as_of_date}}</p></div>
+    </div>
+    <div class="op-card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead><tr><th>Source total</th><th>Amount</th><th>Source total</th><th>Amount</th></tr></thead>
+                <tbody>
+                    {{#each totalRows}}
+                    <tr>
+                        {{#each this}}
+                        <th>{{label}}</th>
+                        <td>{{#if currency}}{{rupiahExact value}}{{else}}{{number value 4}}{{/if}}</td>
+                        {{/each}}
+                        {{#unless (lookup this 1)}}<th></th><td></td>{{/unless}}
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
+        <h3 class="h6 mt-3">Closing account recap · {{accountTotalsAsOf}}</h3>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-2">
+                <thead><tr><th>Account</th><th>Balance</th></tr></thead>
+                <tbody>{{#each accounts}}<tr><td>{{name}}</td><td>{{rupiahExact value}}</td></tr>{{/each}}</tbody>
+            </table>
+        </div>
+        <p class="mb-0"><strong>Debt to Bisun:</strong> {{rupiahExact debtToBisun}}</p>
+        <p class="text-muted small mt-2 mb-0">These closing totals and balances are transcribed from the PDF footer. The source footer totals do not reconcile to the individual printed rows; both are retained as shown rather than silently altering transaction values.</p>
+    </div>
+</div>
+{{/each}}
+
+<script>
+const journalLocale = {{{json workspacePreferences.language_code}}} === 'id' ? 'id-ID' : 'en-US'
+document.getElementById('journalForm').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const message = document.getElementById('journalMessage')
+    try {
+        const response = await fetch('/api/financial-journal', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+            body: JSON.stringify(Object.fromEntries(new FormData(event.target)))
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Could not save journal entry')
+        message.className = 'alert alert-success mb-4 no-print'
+        message.textContent = result.message
+        event.target.reset()
+        setTimeout(() => location.reload(), 400)
+    } catch (error) {
+        message.className = 'alert alert-danger mb-4 no-print'
+        message.textContent = error.message
+    }
+})
+
+const toggleJournalEntry = document.getElementById('toggleJournalEntry')
+const journalEntryPanel = document.getElementById('journalEntryPanel')
+toggleJournalEntry.addEventListener('click', () => {
+    journalEntryPanel.hidden = !journalEntryPanel.hidden
+    toggleJournalEntry.textContent = journalEntryPanel.hidden ? 'Add journal entry' : 'Close entry form'
+    if (!journalEntryPanel.hidden) journalEntryPanel.scrollIntoView({behavior: 'smooth', block: 'start'})
+})
+
+document.getElementById('journalSearch').addEventListener('input', (event) => {
+    const query = event.target.value.trim().toLocaleLowerCase()
+    document.querySelectorAll('[data-journal-row]').forEach((row) => {
+        row.hidden = !row.textContent.toLocaleLowerCase().includes(query)
+    })
+})
+
+const journalPaymentForm = document.getElementById('journalPaymentForm')
+if (journalPaymentForm) {
+    const paymentEntry = document.getElementById('paymentEntry')
+    const paymentAmount = document.getElementById('paymentAmount')
+    const paymentBalance = document.getElementById('paymentBalance')
+
+    paymentEntry.addEventListener('change', () => {
+        const option = paymentEntry.selectedOptions[0]
+        const outstanding = Number(option?.dataset.outstanding || 0)
+        paymentAmount.max = String(outstanding)
+        paymentBalance.textContent = outstanding
+            ? `Outstanding balance: ${Number(outstanding).toLocaleString(journalLocale, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`
+            : 'Select an entry to see its balance.'
+    })
+
+    journalPaymentForm.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const message = document.getElementById('journalMessage')
+        const values = Object.fromEntries(new FormData(event.target))
+        const selected = paymentEntry.selectedOptions[0]
+        if (Number(values.amountPaid) > Number(selected?.dataset.outstanding || 0)) {
+            message.className = 'alert alert-danger mb-4 no-print'
+            message.textContent = 'Payment cannot be greater than the outstanding balance.'
+            return
+        }
+        try {
+            const response = await fetch(`/api/financial-journal/${encodeURIComponent(values.journalId)}/payment`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json', ...window.stockFlowCsrfHeaders()},
+                body: JSON.stringify({amountPaid: values.amountPaid, settlementDate: values.settlementDate})
+            })
+            const result = await response.json()
+            if (!response.ok) throw new Error(result.error || 'Could not update payment status')
+            message.className = 'alert alert-success mb-4 no-print'
+            message.textContent = result.message
+            setTimeout(() => location.reload(), 400)
+        } catch (error) {
+            message.className = 'alert alert-danger mb-4 no-print'
+            message.textContent = error.message
+        }
+    })
+}
+</script>
