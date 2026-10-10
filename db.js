@@ -89,7 +89,9 @@ const ensureTableAndColumns = async (targetPool) => {
                 purchase_settlement_date DATE NULL,
                 purchase_due_date DATE NULL,
                 sale_settlement_date DATE NULL,
-                sale_due_date DATE NULL
+                sale_due_date DATE NULL,
+                remaining_debt DECIMAL(15,2) NOT NULL DEFAULT 0,
+                remaining_receivables DECIMAL(15,2) NOT NULL DEFAULT 0
             )
         `);
         
@@ -97,7 +99,9 @@ const ensureTableAndColumns = async (targetPool) => {
             `ALTER TABLE financial_journal ADD COLUMN purchase_settlement_date DATE NULL`,
             `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL`,
             `ALTER TABLE financial_journal ADD COLUMN sale_settlement_date DATE NULL`,
-            `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL`
+            `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL`,
+            `ALTER TABLE financial_journal ADD COLUMN remaining_debt DECIMAL(15,2) NOT NULL DEFAULT 0`,
+            `ALTER TABLE financial_journal ADD COLUMN remaining_receivables DECIMAL(15,2) NOT NULL DEFAULT 0`
         ];
 
         for (const query of requiredColumns) {
@@ -105,7 +109,7 @@ const ensureTableAndColumns = async (targetPool) => {
                 await targetPool.query(query);
             } catch (colErr) {
                 if (colErr.errno !== 1060) {
-                    // Safe ignore
+                    // Safe ignore duplicate column error
                 }
             }
         }
