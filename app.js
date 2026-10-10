@@ -2543,6 +2543,15 @@ app.get('/purchase-orders', async (req, res) => {
 })
 
 const ensurePreOrdersTable = async () => {
+    // 1. Ensure the parent 'items' table exists first so foreign keys don't fail
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NULL
+        )
+    `);
+
+    // 2. Now safely create the pre_orders table
     await pool.query(`
         CREATE TABLE IF NOT EXISTS pre_orders (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -2557,7 +2566,7 @@ const ensurePreOrdersTable = async () => {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (item_id) REFERENCES items(id)
         )
-    `)
+    `);
 }
 
 const ensureWorkspaceOnboardingTable = async () => {
