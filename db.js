@@ -165,10 +165,32 @@ const ensureSchema = async (targetPool) => {
             "ADD COLUMN type VARCHAR(50) NULL",
             "ADD COLUMN name VARCHAR(255) NULL",
             "ADD COLUMN order_date DATE NULL",
+            "ADD COLUMN quantity_kg DECIMAL(15,3) NOT NULL DEFAULT 0",
+            "ADD COLUMN quantity_in_kg DECIMAL(15,3) NOT NULL DEFAULT 0",
+            "ADD COLUMN quantity_out_kg DECIMAL(15,3) NOT NULL DEFAULT 0",
+            "ADD COLUMN stock_remaining DECIMAL(15,3) NOT NULL DEFAULT 0",
+            "ADD COLUMN brand VARCHAR(255) NULL",
+            "ADD COLUMN serial_number VARCHAR(255) NULL",
+            "ADD COLUMN adjustment DECIMAL(15,2) NOT NULL DEFAULT 0",
+            "ADD COLUMN purchase_price_per_unit DECIMAL(15,4) NOT NULL DEFAULT 0",
+            "ADD COLUMN total_purchase_price DECIMAL(15,2) NOT NULL DEFAULT 0",
+            "ADD COLUMN purchase_amount_paid DECIMAL(15,2) NOT NULL DEFAULT 0",
             "ADD COLUMN purchase_settlement_date DATE NULL",
             "ADD COLUMN purchase_due_date DATE NULL",
+            "ADD COLUMN selling_price_per_unit DECIMAL(15,4) NOT NULL DEFAULT 0",
+            "ADD COLUMN total_selling_price DECIMAL(15,2) NOT NULL DEFAULT 0",
+            "ADD COLUMN sale_amount_received DECIMAL(15,2) NOT NULL DEFAULT 0",
             "ADD COLUMN sale_settlement_date DATE NULL",
-            "ADD COLUMN sale_due_date DATE NULL"
+            "ADD COLUMN sale_due_date DATE NULL",
+            "ADD COLUMN payment_status VARCHAR(50) NULL",
+            "ADD COLUMN paid_status VARCHAR(50) NULL",
+            "ADD COLUMN commission DECIMAL(15,2) NOT NULL DEFAULT 0",
+            "ADD COLUMN commission_paid_status VARCHAR(50) NULL",
+            "ADD COLUMN paid_commission DECIMAL(15,2) NOT NULL DEFAULT 0",
+            "ADD COLUMN profit DECIMAL(15,2) NOT NULL DEFAULT 0",
+            "ADD COLUMN paid_to VARCHAR(255) NULL",
+            "ADD COLUMN notes VARCHAR(255) NULL",
+            "ADD COLUMN import_reference VARCHAR(255) NULL"
         ]
         for (const colQuery of journalColumns) {
             try {
