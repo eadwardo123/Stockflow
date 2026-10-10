@@ -114,29 +114,28 @@ const pool = {
     end: () => Promise.all([...pools.values()].map((workspacePool) => workspacePool.end()))
 }
 
-// Safely initialize the base table and columns on startup
+// Safely initialize the base table and ensure all required columns exist on startup
 try {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS financial_journal (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            purchase_settlement_date DATE NULL,
-            purchase_due_date DATE NULL,
-            sale_settlement_date DATE NULL,
-            sale_due_date DATE NULL
+            id INT AUTO_INCREMENT PRIMARY KEY
         )
     `);
     
-    const alterQueries = [
-        `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL AFTER purchase_settlement_date`,
-        `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL AFTER sale_settlement_date`
+    const requiredColumns = [
+        `ALTER TABLE financial_journal ADD COLUMN purchase_settlement_date DATE NULL`,
+        `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL`,
+        `ALTER TABLE financial_journal ADD COLUMN sale_settlement_date DATE NULL`,
+        `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL`
     ];
 
-    for (const query of alterQueries) {
+    for (const query of requiredColumns) {
         try {
             await pool.query(query);
-        } catch (alterErr) {
-            if (alterErr.errno !== 1060) {
-                console.error("Migration note:", alterErr.message);
+        } catch (colErr) {
+            // Ignore error if column already exists (MySQL Error code 1060)
+            if (colErr.errno !== 1060) {
+                console.log("Column migration note:", colErr.message);
             }
         }
     }
