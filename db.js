@@ -21,12 +21,69 @@ const workspaceContext = new AsyncLocalStorage()
 
 const quoteIdentifier = (value) => `\`${String(value).replace(/`/g, '``')}\``
 
-// Automatically ensure required tables and columns exist on any database pool
+// Automatically ensure all core tables and columns exist on any database pool
 const ensureTableAndColumns = async (targetPool) => {
     try {
+        // 1. Items table (Parent for inventory & pre_orders)
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NULL,
+                minimum_stock DECIMAL(15,3) NOT NULL DEFAULT 0
+            )
+        `);
+
+        // 2. Inventory table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS inventory (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                item_id INT NOT NULL,
+                quantity DECIMAL(15,3) NOT NULL DEFAULT 0,
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            )
+        `);
+
+        // 3. Purchase Orders table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS purchase_orders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                status VARCHAR(50) NOT NULL DEFAULT 'PENDING'
+            )
+        `);
+
+        // 4. Stock Transfers table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS stock_transfers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                status VARCHAR(50) NOT NULL DEFAULT 'PENDING'
+            )
+        `);
+
+        // 5. Pre Orders table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS pre_orders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                item_id INT NOT NULL,
+                customer_name VARCHAR(255) NOT NULL,
+                quantity DECIMAL(15,3) NOT NULL,
+                unit_price DECIMAL(15,2) NOT NULL DEFAULT 0,
+                status ENUM('PENDING','FULFILLED','CANCELLED') NOT NULL DEFAULT 'PENDING',
+                order_date DATE NOT NULL,
+                expected_date DATE NULL,
+                notes VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            )
+        `);
+
+        // 6. Financial Journal table & columns
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS financial_journal (
-                id INT AUTO_INCREMENT PRIMARY KEY
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                purchase_settlement_date DATE NULL,
+                purchase_due_date DATE NULL,
+                sale_settlement_date DATE NULL,
+                sale_due_date DATE NULL
             )
         `);
         
@@ -41,21 +98,19 @@ const ensureTableAndColumns = async (targetPool) => {
             try {
                 await targetPool.query(query);
             } catch (colErr) {
-                // Ignore error if column already exists (MySQL Error code 1060)
-                if (colErr.errno !== 1060) {
-                    // Suppress or log safely
+                if (colErr.errno !== 1060) { // Ignore duplicate column errors
+                    // Safe ignore
                 }
             }
         }
     } catch (err) {
-        // Silently pass or log safely
+        console.error("Database initialization note:", err.message);
     }
 }
 
 const getPool = (databaseName) => {
     if (!pools.has(databaseName)) {
         const newPool = mysql.createPool({...poolOptions, database: databaseName})
-        // Ensure schema is up to date whenever a workspace pool is created
         ensureTableAndColumns(newPool)
         pools.set(databaseName, newPool)
     }
