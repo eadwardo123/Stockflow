@@ -53,7 +53,7 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
     }
 
     await basePool.query(
-        `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(databaseName)} CHARACTER SET ${characterSet} COLLATE ${collation}`
+        `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(databaseName)} CHARACTER SET ${characterSet} COLLATE${collation}`
     )
 
     const [sourceTables] = await basePool.query(`
@@ -112,6 +112,32 @@ const pool = {
     execute: (...args) => currentPool().execute(...args),
     getConnection: () => currentPool().getConnection(),
     end: () => Promise.all([...pools.values()].map((workspacePool) => workspacePool.end()))
+}
+
+// Safely initialize the base table and columns on startup
+try {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS financial_journal (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            purchase_settlement_date DATE NULL,
+            purchase_due_date DATE NULL
+        )
+    `);
+    
+    try {
+        await pool.query(`
+            ALTER TABLE financial_journal 
+            ADD COLUMN purchase_due_date DATE NULL 
+            AFTER purchase_settlement_date
+        `);
+    } catch (alterErr) {
+        // Ignore error if column already exists (Error code 1060)
+        if (alterErr.errno !== 1060) {
+            console.error("Note on financial_journal migration:", alterErr.message);
+        }
+    }
+} catch (err) {
+    console.error("Database startup initialization error:", err);
 }
 
 export default pool
