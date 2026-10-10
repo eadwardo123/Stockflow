@@ -120,20 +120,24 @@ try {
         CREATE TABLE IF NOT EXISTS financial_journal (
             id INT AUTO_INCREMENT PRIMARY KEY,
             purchase_settlement_date DATE NULL,
-            purchase_due_date DATE NULL
+            purchase_due_date DATE NULL,
+            sale_settlement_date DATE NULL,
+            sale_due_date DATE NULL
         )
     `);
     
-    try {
-        await pool.query(`
-            ALTER TABLE financial_journal 
-            ADD COLUMN purchase_due_date DATE NULL 
-            AFTER purchase_settlement_date
-        `);
-    } catch (alterErr) {
-        // Ignore error if column already exists (Error code 1060)
-        if (alterErr.errno !== 1060) {
-            console.error("Note on financial_journal migration:", alterErr.message);
+    const alterQueries = [
+        `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL AFTER purchase_settlement_date`,
+        `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL AFTER sale_settlement_date`
+    ];
+
+    for (const query of alterQueries) {
+        try {
+            await pool.query(query);
+        } catch (alterErr) {
+            if (alterErr.errno !== 1060) {
+                console.error("Migration note:", alterErr.message);
+            }
         }
     }
 } catch (err) {
