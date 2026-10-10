@@ -163,6 +163,7 @@ const ensureSchema = async (targetPool) => {
         const journalColumns = [
             "ADD COLUMN number VARCHAR(100) NULL",
             "ADD COLUMN type VARCHAR(50) NULL",
+            "ADD COLUMN name VARCHAR(255) NULL",
             "ADD COLUMN order_date DATE NULL",
             "ADD COLUMN purchase_settlement_date DATE NULL",
             "ADD COLUMN purchase_due_date DATE NULL",
