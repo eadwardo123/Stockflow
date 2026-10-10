@@ -18,16 +18,13 @@ const poolOptions = {
 const basePool = mysql.createPool({...poolOptions, database: baseDatabase})
 const pools = new Map([[baseDatabase, basePool]])
 const workspaceContext = new AsyncLocalStorage()
-const initializedPools = new Set()
 
 const quoteIdentifier = (value) => {
     return "`" + String(value).replace(/`/g, "``") + "`"
 }
 
-// Automatically ensure required tables and columns exist
+// Automatically ensure required tables and columns exist on every pool connection
 const ensureSchema = async (targetPool) => {
-    const poolKey = targetPool.pool?.config?.database || 'pool'
-    if (initializedPools.has(poolKey)) return
     try {
         // 1. Inventory Transactions table & columns
         await targetPool.query(
@@ -177,8 +174,6 @@ const ensureSchema = async (targetPool) => {
                 await targetPool.query(`ALTER TABLE financial_journal ${colQuery}`)
             } catch (e) { if (e.errno !== 1060) {} }
         }
-
-        initializedPools.add(poolKey)
     } catch (err) {
         console.error("Table initialization note:", err.message)
     }
@@ -243,7 +238,7 @@ const pool = {
         const p = await getCurrentPool()
         return p.getConnection()
     },
-    end: () => Promise.all(Array.all(pools.values()).map((workspacePool) => workspacePool.end()))
+    end: () => Promise.all(Array.from(pools.values()).map((workspacePool) => workspacePool.end()))
 }
 
 export default pool
