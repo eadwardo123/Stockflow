@@ -309,6 +309,10 @@ app.use(express.urlencoded({
     limit: '1mb'
 }))
 
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 app.use(session({
     name: 'stockflow.sid',
     secret: sessionSecret || 'SESSION_SECRET must be set in production',
@@ -451,9 +455,7 @@ const ensureWorkspaceAuditLog = async () => {
     await check
 }
 
-app.get('/health', (req, res) => {
-    res.status(200).send('OK');
-});
+
 
 app.use(async (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.session.user || !req.workspaceDatabase) return next()
