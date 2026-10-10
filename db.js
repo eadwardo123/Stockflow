@@ -3,13 +3,12 @@ import dotenv from 'dotenv'
 import {AsyncLocalStorage} from 'node:async_hooks'
 
 dotenv.config()
-
-const baseDatabase = process.env.MYSQL_DATABASE
-const mysqlPort = Number(process.env.MYSQL_PORT || process.env.MYSQL_POST) || 3306
+const baseDatabase = process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE
+const mysqlPort = Number(process.env.MYSQLPORT || process.env.MYSQL_PORT || 3306)
 const poolOptions = {
-    host : process.env.MYSQL_HOST,
-    user : process.env.MYSQL_USERNAME,
-    password : process.env.MYSQL_PASSWORD,
+    host : process.env.MYSQLHOST || process.env.MYSQL_HOST,
+    user : process.env.MYSQLUSER || process.env.MYSQL_USERNAME,
+    password : process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD,
     port: mysqlPort,
     waitForConnections : true,
     connectionLimit : 10,
