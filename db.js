@@ -39,17 +39,32 @@ const ensureSchema = async (targetPool) => {
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
         )
         
-        // 2. Items table & item_name column
+        // 2. Brands table
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS brands (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "brand_name VARCHAR(255) NULL)"
+        )
+
+        // 3. Items table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS items (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
             "name VARCHAR(255) NULL)"
         )
-        try {
-            await targetPool.query("ALTER TABLE items ADD COLUMN item_name VARCHAR(255) NULL")
-        } catch (e) { if (e.errno !== 1060) {} }
+        const itemColumns = [
+            "ADD COLUMN item_name VARCHAR(255) NULL",
+            "ADD COLUMN item_code VARCHAR(100) NULL",
+            "ADD COLUMN brand_id INT NULL",
+            "ADD COLUMN minimum_stock DECIMAL(15,3) NOT NULL DEFAULT 0"
+        ]
+        for (const colQuery of itemColumns) {
+            try {
+                await targetPool.query(`ALTER TABLE items ${colQuery}`)
+            } catch (e) { if (e.errno !== 1060) {} }
+        }
 
-        // 3. Warehouse table & warehouse_name column
+        // 4. Warehouse table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS warehouse (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -57,6 +72,17 @@ const ensureSchema = async (targetPool) => {
         )
         try {
             await targetPool.query("ALTER TABLE warehouse ADD COLUMN warehouse_name VARCHAR(255) NULL")
+        } catch (e) { if (e.errno !== 1060) {} }
+
+        // 5. Shelves table & columns
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS shelves (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "name VARCHAR(255) NULL, " +
+            "warehouse_id INT NULL)"
+        )
+        try {
+            await targetPool.query("ALTER TABLE shelves ADD COLUMN shelf_code VARCHAR(100) NULL")
         } catch (e) { if (e.errno !== 1060) {} }
 
         initializedPools.add(poolKey)
