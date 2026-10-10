@@ -1571,10 +1571,10 @@ const ensureFinancialJournalDueDates = async () => {
             `)
             const existingColumns = new Set(columns.map((column) => column.columnName))
             if (!existingColumns.has('purchase_due_date')) {
-                await pool.query('ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL AFTER purchase_settlement_date')
+                await pool.query('ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL')
             }
             if (!existingColumns.has('sale_due_date')) {
-                await pool.query('ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL AFTER sale_settlement_date')
+                await pool.query('ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL')
             }
         })()
         financialJournalDueDateChecks.set(databaseName, check)
@@ -1582,7 +1582,6 @@ const ensureFinancialJournalDueDates = async () => {
     }
     await check
 }
-
 const createAutomaticJournalEntry = async (connection, entry) => {
     await connection.query(`
         INSERT INTO financial_journal
