@@ -451,6 +451,10 @@ const ensureWorkspaceAuditLog = async () => {
     await check
 }
 
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 app.use(async (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.session.user || !req.workspaceDatabase) return next()
     try {
