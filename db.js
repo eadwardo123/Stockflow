@@ -18,129 +18,9 @@ const poolOptions = {
 const basePool = mysql.createPool({...poolOptions, database: baseDatabase})
 const pools = new Map([[baseDatabase, basePool]])
 const workspaceContext = new AsyncLocalStorage()
-const initializedDatabases = new Set()
 
-const quoteIdentifier = (value) => `\`${String(value).replace(/`/g, '``')}\``
-
-// Automatically ensure all core tables and columns exist on any database pool
-const ensureTableAndColumns = async (targetPool) => {
-    try {
-        // 1. Warehouse table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS warehouse (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NULL
-            )
-        `);
-
-        // 2. Shelves table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS shelves (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NULL,
-                warehouse_id INT NULL
-            )
-        `);
-
-        // 3. Suppliers table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS suppliers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NULL
-            )
-        `);
-
-        // 4. Items table & columns
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS items (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NULL,
-                minimum_stock DECIMAL(15,3) NOT NULL DEFAULT 0
-            )
-        `);
-        try {
-            await targetPool.query(`ALTER TABLE items ADD COLUMN minimum_stock DECIMAL(15,3) NOT NULL DEFAULT 0`);
-        } catch (colErr) {
-            if (colErr.errno !== 1060) { /* Ignore duplicate column error */ }
-        }
-
-        // 5. Inventory table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS inventory (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                item_id INT NOT NULL,
-                quantity DECIMAL(15,3) NOT NULL DEFAULT 0,
-                FOREIGN KEY (item_id) REFERENCES items(id)
-            )
-        `);
-
-        // 6. Purchase Orders table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS purchase_orders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                status VARCHAR(50) NOT NULL DEFAULT 'PENDING'
-            )
-        `);
-
-        // 7. Stock Transfers table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS stock_transfers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                status VARCHAR(50) NOT NULL DEFAULT 'PENDING'
-            )
-        `);
-
-        // 8. Pre Orders table
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS pre_orders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                item_id INT NOT NULL,
-                customer_name VARCHAR(255) NOT NULL,
-                quantity DECIMAL(15,3) NOT NULL,
-                unit_price DECIMAL(15,2) NOT NULL DEFAULT 0,
-                status ENUM('PENDING','FULFILLED','CANCELLED') NOT NULL DEFAULT 'PENDING',
-                order_date DATE NOT NULL,
-                expected_date DATE NULL,
-                notes VARCHAR(255) NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (item_id) REFERENCES items(id)
-            )
-        `);
-
-        // 9. Financial Journal table & columns
-        await targetPool.query(`
-            CREATE TABLE IF NOT EXISTS financial_journal (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                purchase_settlement_date DATE NULL,
-                purchase_due_date DATE NULL,
-                sale_settlement_date DATE NULL,
-                sale_due_date DATE NULL,
-                remaining_debt DECIMAL(15,2) NOT NULL DEFAULT 0,
-                remaining_receivables DECIMAL(15,2) NOT NULL DEFAULT 0
-            )
-        `);
-        
-        const requiredColumns = [
-            `ALTER TABLE financial_journal ADD COLUMN purchase_settlement_date DATE NULL`,
-            `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL`,
-            `ALTER TABLE financial_journal ADD COLUMN sale_settlement_date DATE NULL`,
-            `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL`,
-            `ALTER TABLE financial_journal ADD COLUMN remaining_debt DECIMAL(15,2) NOT NULL DEFAULT 0`,
-            `ALTER TABLE financial_journal ADD COLUMN remaining_receivables DECIMAL(15,2) NOT NULL DEFAULT 0`
-        ];
-
-        for (const query of requiredColumns) {
-            try {
-                await targetPool.query(query);
-            } catch (colErr) {
-                if (colErr.errno !== 1060) {
-                    // Safe ignore duplicate column error
-                }
-            }
-        }
-    } catch (err) {
-        console.error("Database initialization note:", err.message);
-    }
+const quoteIdentifier = (value) => {
+    return "`" + String(value).replace(/`/g, "``") + "`"
 }
 
 const getPool = (databaseName) => {
@@ -150,14 +30,9 @@ const getPool = (databaseName) => {
     return pools.get(databaseName)
 }
 
-const ensureInitializedForCurrentContext = async () => {
+const getCurrentPool = () => {
     const dbName = workspaceContext.getStore() || baseDatabase
-    const p = getPool(dbName)
-    if (!initializedDatabases.has(dbName)) {
-        await ensureTableAndColumns(p)
-        initializedDatabases.add(dbName)
-    }
-    return p
+    return getPool(dbName)
 }
 
 export const runWithWorkspaceDatabase = (databaseName, callback) =>
@@ -167,96 +42,43 @@ export const runWithBaseDatabase = (callback) =>
     workspaceContext.run(baseDatabase, callback)
 
 export const ensureWorkspaceDatabase = async (databaseName) => {
-    if (!/^[a-zA-Z0-9_]+$/.test(databaseName) || databaseName.length > 64) {
-        throw new Error('Invalid workspace database name')
+    // Using RegExp constructor to avoid forward-slash copy/paste parser issues
+    const nameRegex = new RegExp("^[a-zA-Z0-9_]+$")
+    if (!nameRegex.test(databaseName) || databaseName.length > 64) {
+        throw new Error("Invalid workspace database name")
     }
 
-    const [[sourceSchema]] = await basePool.query(`
-        SELECT DEFAULT_CHARACTER_SET_NAME AS character_set,
-               DEFAULT_COLLATION_NAME AS collation
-        FROM information_schema.SCHEMATA
-        WHERE SCHEMA_NAME = ?
-    `, [baseDatabase])
-    if (!sourceSchema) throw new Error('Configured MySQL database does not exist')
+    const [[sourceSchema]] = await basePool.query(
+        "SELECT DEFAULT_CHARACTER_SET_NAME AS character_set, DEFAULT_COLLATION_NAME AS collation FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+        [baseDatabase]
+    )
+    if (!sourceSchema) throw new Error("Configured MySQL database does not exist")
     const characterSet = String(sourceSchema.character_set)
     const collation = String(sourceSchema.collation)
-    if (!/^[a-zA-Z0-9_]+$/.test(characterSet) || !/^[a-zA-Z0-9_]+$/.test(collation)) {
-        throw new Error('Invalid MySQL database character set')
+    
+    if (!nameRegex.test(characterSet) || !nameRegex.test(collation)) {
+        throw new Error("Invalid MySQL database character set")
     }
 
     await basePool.query(
-        `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(databaseName)} CHARACTER SET ${characterSet} COLLATE${collation}`
+        "CREATE DATABASE IF NOT EXISTS " + quoteIdentifier(databaseName) + " CHARACTER SET " + characterSet + " COLLATE " + collation
     )
-
-    const workspacePool = getPool(databaseName)
-    await ensureTableAndColumns(workspacePool)
-    initializedDatabases.add(databaseName)
-
-    const [sourceTables] = await basePool.query(`
-        SELECT TABLE_NAME AS table_name
-        FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'
-          AND TABLE_NAME NOT IN (?, ?, ?, ?, ?)
-        ORDER BY TABLE_NAME
-    `, [baseDatabase, 'app_users', 'app_sessions', 'app_workspace', 'app_user_workspaces', 'app_workspace_invites'])
-    
-    const [targetTables] = await workspacePool.query(
-        'SELECT TABLE_NAME AS table_name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?',
-        [databaseName]
-    )
-    const existingTables = new Set(targetTables.map((row) => row.table_name))
-    const tableNames = new Set(sourceTables.map((row) => row.table_name))
-    const dependencies = new Map([...tableNames].map((tableName) => [tableName, new Set()]))
-    const [foreignKeys] = await basePool.query(`
-        SELECT TABLE_NAME AS table_name, REFERENCED_TABLE_NAME AS referenced_table_name
-        FROM information_schema.KEY_COLUMN_USAGE
-        WHERE CONSTRAINT_SCHEMA = ? AND REFERENCED_TABLE_SCHEMA = ?
-          AND REFERENCED_TABLE_NAME IS NOT NULL
-    `, [baseDatabase, baseDatabase])
-    for (const key of foreignKeys) {
-        if (key.table_name !== key.referenced_table_name && tableNames.has(key.table_name) && tableNames.has(key.referenced_table_name)) {
-            dependencies.get(key.table_name).add(key.referenced_table_name)
-        }
-    }
-
-    const pending = new Set([...tableNames].filter((tableName) => !existingTables.has(tableName)))
-    while (pending.size > 0) {
-        const ready = [...pending].filter((tableName) =>
-            [...dependencies.get(tableName)].every((dependency) => !pending.has(dependency))
-        )
-        if (ready.length === 0) throw new Error('Could not order workspace tables by foreign-key dependencies')
-
-        for (const tableName of ready) {
-            const [[definition]] = await basePool.query(
-                `SHOW CREATE TABLE ${quoteIdentifier(baseDatabase)}.${quoteIdentifier(tableName)}`
-            )
-            const createStatement = Object.values(definition)[1]
-                .replace(/^CREATE TABLE `[^`]+`/, `CREATE TABLE ${quoteIdentifier(databaseName)}.${quoteIdentifier(tableName)}`)
-                .replace(/REFERENCES\s+(?:`[^`]+`\.)?`([^`]+)`/g, (_, referencedTable) =>
-                    `REFERENCES ${quoteIdentifier(databaseName)}.${quoteIdentifier(referencedTable)}`
-                )
-                .replace(/\sAUTO_INCREMENT=\d+/i, '')
-            await workspacePool.query(createStatement)
-            pending.delete(tableName)
-        }
-    }
 }
 
-// Intercept all pool operations to guarantee tables and columns exist before any query runs
 const pool = {
     query: async (...args) => {
-        const p = await ensureInitializedForCurrentContext()
+        const p = getCurrentPool()
         return p.query(...args)
     },
     execute: async (...args) => {
-        const p = await ensureInitializedForCurrentContext()
+        const p = getCurrentPool()
         return p.execute(...args)
     },
     getConnection: async () => {
-        const p = await ensureInitializedForCurrentContext()
+        const p = getCurrentPool()
         return p.getConnection()
     },
-    end: () => Promise.all([...pools.values()].map((workspacePool) => workspacePool.end()))
+    end: () => Promise.all(Array.from(pools.values()).map((workspacePool) => workspacePool.end()))
 }
 
 export default pool
