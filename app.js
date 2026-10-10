@@ -15,13 +15,6 @@ import inventoryRouter from './inventory.js';
 import http from 'http';
 import { Server } from 'socket.io';
 
-
-
-// This file bootstraps the StockFlow web application.
-// It creates the Express server, configures session security,
-// handles authentication and authorization, and exposes the routes used to
-// manage inventory, purchase orders, transfers, invoices, and financial journal data.
-
 const app = express()
 app.use((req, res, next) => {
   req.io = io;
@@ -31,14 +24,12 @@ const server = http.createServer(app);
 const io = new Server(server);
 const port = Number(process.env.PORT) || 3003
 const production = process.env.NODE_ENV === 'production'
-// Trust only explicitly configured reverse proxies so IP-based limits and secure cookies use the correct request data.
 const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0)
 
 if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0) {
     throw new Error('TRUST_PROXY_HOPS must be a non-negative integer')
 }
 if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops)
-// Add baseline HTTP security headers; CSP is deferred while pages still use inline scripts and CDN assets.
 app.use(helmet({contentSecurityPolicy: false}))
 const mysqlPort = Number(process.env.MYSQL_PORT || process.env.MYSQL_POST) || 3306
 if (production && !process.env.SESSION_SECRET) {
@@ -52,8 +43,6 @@ const MySQLStore = MySQLStoreFactory(session)
 const sessionLifetime = 24 * 60 * 60 * 1000
 let workspaceOwnerId = null
 
-// Store user sessions in MySQL so logins survive across server restarts and
-// users can remain authenticated without storing plain session cookies in memory.
 const sessionStore = new MySQLStore({
     host: process.env.MYSQL_HOST,
     port: mysqlPort,
@@ -314,15 +303,12 @@ app.engine('handlebars', engine({
 app.set('view engine', 'handlebars')
 app.set('views', './views')
 
-// Parse JSON payloads and form submissions, rejecting oversized requests before route handling.
 app.use(express.json({limit: '1mb'}))
 app.use(express.urlencoded({
     extended: true,
     limit: '1mb'
 }))
 
-// Configure the session middleware. Every authenticated request keeps a user
-// record, a CSRF token, and a database context for the active workspace.
 app.use(session({
     name: 'stockflow.sid',
     secret: sessionSecret || 'SESSION_SECRET must be set in production',
@@ -345,9 +331,6 @@ app.use((req, res, next) => {
     next()
 })
 
-// Force login checks for the protected pages and API endpoints. If the user is
-// not authenticated, the app redirects browser requests to the login page and
-// returns a 401 JSON response for API calls.
 app.use(async (req, res, next) => {
     if (['/login', '/register', '/logout'].includes(req.path)
         || req.path.startsWith('/invite/')
@@ -405,8 +388,6 @@ app.use(async (req, res, next) => {
     }
 })
 
-// CSRF protection ensures that only the same browser session can submit
-// sensitive actions such as registration, login, logout, and updates.
 const createCsrfToken = (req) => {
     if (typeof req.session.csrfToken !== 'string' || !/^[a-f0-9]{64}$/.test(req.session.csrfToken)) {
         req.session.csrfToken = randomBytes(32).toString('hex')
@@ -431,11 +412,8 @@ const verifyCsrfToken = (req, token = req.body.csrfToken) => typeof token === 's
     && /^[a-f0-9]{64}$/.test(token)
     && timingSafeEqual(Buffer.from(token), Buffer.from(req.session.csrfToken))
 
-
-
 app.use('/api', (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
-    // Require a session-matching token before an API request can change data.
     if (!verifyCsrfToken(req, req.get('x-csrf-token'))) {
         return res.status(403).json({error: 'Your request token is invalid or expired. Refresh the page and try again.'})
     }
@@ -502,8 +480,6 @@ const regenerateSession = (req) => new Promise((resolve, reject) => {
     req.session.regenerate((error) => error ? reject(error) : resolve())
 })
 
-// Password hashing uses a per-user salt and the scrypt key derivation function so
-// stored credentials are not plain text and can be safely compared in constant time.
 const hashPassword = async (password) => {
     const salt = randomBytes(16)
     const hash = await scrypt(password, salt, 64)
@@ -537,7 +513,6 @@ const renderAuth = (res, mode, error = null, csrfToken = '', next = '/', statusC
     })
 }
 
-// Slow repeated sign-in and account-creation attempts from the same client IP.
 const createAuthRateLimit = (mode, limit) => rateLimit({
     windowMs: 15 * 60 * 1000,
     limit,
@@ -739,8 +714,6 @@ app.post('/logout', (req, res, next) => {
     })
 })
 
-// Shared validation helpers convert request values into safe types and reject
-// invalid inputs before they touch the database.
 const positiveNumber = (value, fieldName) => {
     const number = Number(value)
     if (!Number.isFinite(number) || number <= 0) {
@@ -789,7 +762,6 @@ const requiredDate = (value, fieldName) => {
 
 const makeNumber = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 
-// Log full errors privately while returning only safe, useful messages to clients.
 const sendError = (res, error) => {
     console.error(error)
     const duplicate = error.code === 'ER_DUP_ENTRY'
@@ -802,7 +774,6 @@ const sendError = (res, error) => {
     res.status(status).json({error: message})
 }
 
-// Keep database and server exception details out of rendered-page responses.
 const sendServerError = (res, error) => {
     console.error(error)
     res.status(500).send('Unable to complete the request.')
@@ -986,8 +957,6 @@ const restoreWorkspaceSnapshot = async (databaseName, snapshot) => {
     })
 }
 
-// Inventory utility functions keep stock balances and cost layers in sync when
-// items are purchased, sold, transferred, or returned.
 const addInventory = async (connection, itemId, warehouseId, shelfId, quantity) => {
     await connection.query(
         `INSERT INTO inventory (item_id, warehouse_id, shelf_id, quantity)
@@ -997,7 +966,6 @@ const addInventory = async (connection, itemId, warehouseId, shelfId, quantity) 
     )
 }
 
-// Returns { avgCost, markupPct } for an item — defaults to 0 / 30 when no row exists yet.
 const getItemCost = async (connection, itemId) => {
     const [[row]] = await connection.query(
         'SELECT avg_cost, markup_pct FROM item_costs WHERE item_id = ?', [itemId]
@@ -1007,7 +975,6 @@ const getItemCost = async (connection, itemId) => {
         : {avgCost: 0, markupPct: 30}
 }
 
-// Weighted-average cost recalculation — call BEFORE addInventory so oldQty is pre-receipt.
 const recalcAvgCost = async (connection, itemId, addedQty, purchaseUnitCost) => {
     const [[before]] = await connection.query(
         'SELECT COALESCE(SUM(quantity), 0) AS total_qty FROM inventory WHERE item_id = ?', [itemId]
@@ -1034,7 +1001,6 @@ const addFifoLayer = async (connection, itemId, warehouseId, shelfId, quantity, 
     `, [itemId, warehouseId, shelfId, quantity, quantity, unitCost, referenceNumber, receivedAt, productionDate])
 }
 
-// Consume the oldest cost layers for one shelf and return the FIFO COGS breakdown.
 const consumeFifoLayers = async (
     connection,
     itemId,
@@ -1100,7 +1066,6 @@ const transferFifoLayers = async (connection, itemId, fromWarehouseId, shelfId, 
     }
 }
 
-// Dashboard page: shows a high-level summary of items, stock, and recent movement.
 app.get('/', async (req, res) => {
     try {
         await ensureFinancialJournalDueDates()
@@ -1166,7 +1131,6 @@ app.get('/', async (req, res) => {
 })
 
 app.get('/about', (req, res) => res.render('about'))
-
 app.get('/tutorial', (req, res) => res.render('tutorial'))
 
 app.get('/workspace-members', async (req, res) => {
@@ -1368,8 +1332,6 @@ app.patch('/api/onboarding/status', requireWorkspaceRoles('owner', 'admin'), asy
     }
 })
 
-// Lookup endpoints provide the front-end with reference data such as items,
-// warehouses, and suppliers without exposing raw database internals.
 app.get('/api/lookups', async (req, res) => {
     try {
         const [[items], [warehouses], [suppliers]] = await Promise.all([
@@ -1392,7 +1354,6 @@ app.get('/api/lookups', async (req, res) => {
     }
 })
 
-// Move one or more items from the first available source shelves to the first destination shelf.
 app.post('/api/transfers', async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -1431,7 +1392,7 @@ app.post('/api/transfers', async (req, res) => {
                 const moved = Math.min(remaining, Number(source.quantity))
                 await transferFifoLayers(connection, itemId, fromWarehouseId, source.shelf_id, toWarehouseId, destinationShelf.id, moved, transferNumber)
                 await connection.query('UPDATE inventory SET quantity = quantity - ? WHERE id = ?', [moved, source.id])
-                const [result] = await connection.query(`
+                await connection.query(`
                     INSERT INTO inventory_transactions
                     (item_id, warehouse_id, shelf_id, transaction_type, quantity, reference_number, notes)
                     VALUES (?, ?, ?, 'OUT', ?, ?, ?)
@@ -1460,8 +1421,6 @@ app.post('/api/transfers', async (req, res) => {
     }
 })
 
-// Purchase-order creation stores the supplier order header and each ordered item
-// before the items are received into stock.
 app.post('/api/purchase-orders', async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -1495,8 +1454,6 @@ app.post('/api/purchase-orders', async (req, res) => {
     }
 })
 
-// Receiving a purchase order adds stock to inventory and records the resulting
-// accounting and warehouse movement in the journal.
 app.post('/api/purchase-orders/:id/receive', async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -1529,7 +1486,6 @@ app.post('/api/purchase-orders/:id/receive', async (req, res) => {
             const addedQty = Number(item.quantity)
             const purchaseCost = Number(item.unit_cost)
             const productionDate = requiredDate(item.production_date, 'production date')
-            // WAC: must run BEFORE addInventory so oldQty is the pre-receipt quantity
             await recalcAvgCost(connection, item.item_id, addedQty, purchaseCost)
             await addInventory(connection, item.item_id, warehouseId, shelfId, addedQty)
             await addFifoLayer(connection, item.item_id, warehouseId, shelfId, addedQty, purchaseCost, purchaseOrder.po_number, null, productionDate)
@@ -1565,7 +1521,6 @@ app.post('/api/purchase-orders/:id/receive', async (req, res) => {
                 totalSellingPrice: null,
                 remainingReceivables: null,
                 paidStatus: 'Not recorded',
-                remainingReceivables: null,
                 paidTo: purchaseOrder.supplier_name,
                 notes: `Purchase order received: ${itemDetails.item_name}`,
                 sourceTransactionId: transaction.insertId
@@ -1622,8 +1577,6 @@ const ensureFinancialJournalDueDates = async () => {
     await check
 }
 
-// Financial journal helpers centralize the accounting record creation used when
-// stock movements, payments, and journal entries affect the books.
 const createAutomaticJournalEntry = async (connection, entry) => {
     await connection.query(`
         INSERT INTO financial_journal
@@ -1726,8 +1679,6 @@ const createStockMovementFromFinancialJournal = async (connection, entry) => {
     return transaction.insertId
 }
 
-// Download the complete financial journal as a CSV export for reporting or import
-// into external accounting tools.
 app.get('/financial-journal/download.csv', async (req, res) => {
     try {
         const [entries, fields] = await pool.query(
@@ -1744,8 +1695,6 @@ app.get('/financial-journal/download.csv', async (req, res) => {
     }
 })
 
-// The financial-journal screen loads entries, brands, items, warehouses, and
-// summary totals to display the accounting overview and pending payments.
 app.get('/financial-journal', async (req, res) => {
     try {
         await ensureFinancialJournalDueDates()
@@ -1922,8 +1871,6 @@ app.patch('/api/financial-journal/:id/payment', async (req, res) => {
     }
 })
 
-// Custom financial journal entries can be created manually, and when they relate
-// to stock they are synchronized with the inventory ledger as well.
 app.post('/api/financial-journal', async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -2011,8 +1958,6 @@ app.post('/api/financial-journal', async (req, res) => {
     }
 })
 
-// Inventory transactions cover purchases, sales, and returns. The outcome is a
-// stock movement plus journal and cost-layer updates to maintain accurate costing.
 app.post('/api/transactions', async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -2177,8 +2122,6 @@ app.post('/api/transactions', async (req, res) => {
     }
 })
 
-// Item cost APIs expose the current weighted-average cost and markup information
-// so the client can show suggested selling prices and update pricing values.
 app.get('/api/item-costs', async (req, res) => {
     try {
         const [rows] = await pool.query(`
@@ -2196,7 +2139,6 @@ app.get('/api/item-costs', async (req, res) => {
     }
 })
 
-// Update the markup percentage for one item.
 app.patch('/api/item-costs/:itemId', requireWorkspaceRoles('owner', 'admin'), async (req, res) => {
     try {
         const itemId = requiredId(req.params.itemId, 'itemId')
@@ -2213,8 +2155,6 @@ app.patch('/api/item-costs/:itemId', requireWorkspaceRoles('owner', 'admin'), as
     }
 })
 
-// This endpoint returns only non-zero stock positions so the UI can show real-time
-// available inventory by location.
 app.get('/api/inventory/stock', async (req, res) => {
     try {
         const [rows] = await pool.query(`
@@ -2231,7 +2171,6 @@ app.get('/api/inventory/stock', async (req, res) => {
     }
 })
 
-// Shared lookup data keeps multiple pages aligned with the same master data sources.
 const getCommonLookups = async () => {
     const [[items], [warehouses], [shelves], [suppliers], [brands], [units]] = await Promise.all([
         pool.query(`
@@ -2246,7 +2185,6 @@ const getCommonLookups = async () => {
         pool.query('SELECT id, brand_name FROM brands ORDER BY brand_name'),
         pool.query('SELECT id, unit_name FROM units ORDER BY unit_name')
     ])
-    // item_costs table only exists after migration_wac.sql is run — fail gracefully
     let itemCosts = []
     try {
         const [rows] = await pool.query(`
@@ -2259,12 +2197,10 @@ const getCommonLookups = async () => {
             ORDER BY i.item_name
         `)
         itemCosts = rows
-    } catch (_) { /* migration not yet applied */ }
+    } catch (_) {}
     return {items, warehouses, shelves, suppliers, brands, units, itemCosts}
 }
 
-// Stock-transaction page gives a detailed log of every movement with inventory
-// levels and FIFO layer information for analysis and troubleshooting.
 app.get('/stock-transactions', async (req, res) => {
     try {
         const lookups = await getCommonLookups()
@@ -2303,7 +2239,6 @@ app.get('/stock-transactions', async (req, res) => {
     }
 })
 
-// Item detail page shows a single item's stock, cost history, and purchase records.
 app.get('/item-details/:id', async (req, res) => {
     try {
         const itemId = requiredId(req.params.id, 'item id')
@@ -2347,8 +2282,6 @@ app.get('/item-details/:id', async (req, res) => {
     }
 })
 
-// Invoice generation retrieves a sale record and calculates subtotal, tax, and
-// total for rendering either a web view or downloadable PDF invoice.
 const getInvoiceData = async (transactionId) => {
     const [[invoice]] = await pool.query(`
         SELECT t.id, t.created_at AS registered_at, t.customer_name, t.quantity,
@@ -2369,7 +2302,6 @@ const getInvoiceData = async (transactionId) => {
     return {invoice, subtotal, discount, tax, total: taxable + tax}
 }
 
-// PDF invoice exports turn a sale record into a printable document.
 app.get('/invoice/:id/download', async (req, res) => {
     try {
         const transactionId = requiredId(req.params.id, 'transaction id')
@@ -2430,8 +2362,6 @@ app.get('/invoice/:id', async (req, res) => {
     }
 })
 
-// Stock report compiles inventory totals, warehouse summaries, per-item metrics, and
-// selected costing methodology so management can monitor stock health and profitability.
 app.get('/stock-report', async (req, res) => {
     try {
         const selectedMethod = String(req.query.method || 'WAC').toUpperCase()
@@ -2497,7 +2427,6 @@ app.get('/stock-report', async (req, res) => {
             `)
             movement = row
         } catch (_) {
-            // cogs column not yet added — run migration_wac.sql
             const [[row]] = await pool.query(`
                 SELECT COALESCE(SUM(CASE WHEN transaction_type = 'IN'  THEN quantity ELSE 0 END), 0) AS stock_in,
                        COALESCE(SUM(CASE WHEN transaction_type = 'OUT' THEN quantity ELSE 0 END), 0) AS stock_out,
@@ -2529,10 +2458,6 @@ app.get('/stock-report', async (req, res) => {
     }
 })
 
-/* Reset operational data but preserve master data. This is useful for testing and development. */
-
-// This reset route clears operational tables while preserving master data such as
-// items, brands, and warehouse definitions for testing or local cleanup workflows.
 app.post('/api/reset-operational-data', requireWorkspaceRoles('owner'), async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -2556,10 +2481,6 @@ app.post('/api/reset-operational-data', requireWorkspaceRoles('owner'), async (r
     }
 })
 
-/* ends here delete until here */
-
-// Transfers page lists movement history between warehouses and lets users review
-// where stock has been moved.
 app.get('/transfers', async (req, res) => {
     try {
         const {items, warehouses} = await getCommonLookups()
@@ -2574,8 +2495,6 @@ app.get('/transfers', async (req, res) => {
     }
 })
 
-// Purchase-order page renders pending and historical orders with their supplier and
-// total value for operational tracking.
 app.get('/purchase-orders', async (req, res) => {
     try {
         await ensurePreOrdersTable()
@@ -2683,8 +2602,6 @@ app.patch('/api/pre-orders/:id/status', async (req, res) => {
     }
 })
 
-// Master-data page is the administrative view for items, warehouses, brands,
-// suppliers, and units that form the foundation of the business data model.
 app.get('/master-data', requireWorkspaceRoles('owner', 'admin'), async (req, res) => {
     try {
         const {items, warehouses, shelves, suppliers, brands, units, itemCosts} = await getCommonLookups()
@@ -2694,8 +2611,6 @@ app.get('/master-data', requireWorkspaceRoles('owner', 'admin'), async (req, res
     }
 })
 
-// Master-data creation routes add warehouse, shelf, brand, unit, item, and
-// supplier records used across the rest of the application.
 app.post('/api/warehouses', requireWorkspaceRoles('owner', 'admin'), async (req, res) => {
     const connection = await pool.getConnection()
     try {
@@ -2823,8 +2738,6 @@ const runScheduledWorkspaceBackups = async () => {
     }
 }
 
-// Application startup: ensure the authentication tables exist, initialize the
-// workspace owner, and start listening for web requests.
 const startServer = async () => {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS app_users (
@@ -2913,8 +2826,10 @@ const startServer = async () => {
     const [[workspace]] = await pool.query('SELECT owner_user_id FROM app_workspace WHERE id = 1')
     workspaceOwnerId = workspace?.owner_user_id ? Number(workspace.owner_user_id) : null
     await sessionStore.onReady()
-    app.listen(port, () => {
-        console.log(`server run on http://localhost:${port}`)
+
+    const PORT = Number(process.env.PORT) || 3003;
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running on port ${PORT}`);
         if (process.env.BACKUP_ENCRYPTION_KEY) {
             runScheduledWorkspaceBackups().catch((error) => console.error('Scheduled workspace backup failed:', error))
             const backupTimer = setInterval(() => {
@@ -2929,9 +2844,3 @@ startServer().catch((error) => {
     console.error('Unable to initialize authentication storage:', error)
     process.exit(1)
 })
-
-
-const PORT = process.env.PORT || 3007;
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
