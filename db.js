@@ -18,9 +18,29 @@ const poolOptions = {
 const basePool = mysql.createPool({...poolOptions, database: baseDatabase})
 const pools = new Map([[baseDatabase, basePool]])
 const workspaceContext = new AsyncLocalStorage()
+const initializedPools = new Set()
 
 const quoteIdentifier = (value) => {
     return "`" + String(value).replace(/`/g, "``") + "`"
+}
+
+// Lightweight target check to ensure inventory_transactions exists
+const ensureInventoryTransactionsTable = async (targetPool) => {
+    const poolKey = targetPool.pool?.config?.database || 'pool'
+    if (initializedPools.has(poolKey)) return
+    try {
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS inventory_transactions (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "item_id INT NOT NULL, " +
+            "warehouse_id INT NOT NULL, " +
+            "quantity DECIMAL(15,3) NOT NULL DEFAULT 0, " +
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        )
+        initializedPools.add(poolKey)
+    } catch (err) {
+        console.error("Table initialization note:", err.message)
+    }
 }
 
 const getPool = (databaseName) => {
@@ -30,9 +50,11 @@ const getPool = (databaseName) => {
     return pools.get(databaseName)
 }
 
-const getCurrentPool = () => {
+const getCurrentPool = async () => {
     const dbName = workspaceContext.getStore() || baseDatabase
-    return getPool(dbName)
+    const p = getPool(dbName)
+    await ensureInventoryTransactionsTable(p)
+    return p
 }
 
 export const runWithWorkspaceDatabase = (databaseName, callback) =>
@@ -42,7 +64,6 @@ export const runWithBaseDatabase = (callback) =>
     workspaceContext.run(baseDatabase, callback)
 
 export const ensureWorkspaceDatabase = async (databaseName) => {
-    // Using RegExp constructor to avoid forward-slash copy/paste parser issues
     const nameRegex = new RegExp("^[a-zA-Z0-9_]+$")
     if (!nameRegex.test(databaseName) || databaseName.length > 64) {
         throw new Error("Invalid workspace database name")
@@ -63,19 +84,22 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
     await basePool.query(
         "CREATE DATABASE IF NOT EXISTS " + quoteIdentifier(databaseName) + " CHARACTER SET " + characterSet + " COLLATE " + collation
     )
+
+    const workspacePool = getPool(databaseName)
+    await ensureInventoryTransactionsTable(workspacePool)
 }
 
 const pool = {
     query: async (...args) => {
-        const p = getCurrentPool()
+        const p = await getCurrentPool()
         return p.query(...args)
     },
     execute: async (...args) => {
-        const p = getCurrentPool()
+        const p = await getCurrentPool()
         return p.execute(...args)
     },
     getConnection: async () => {
-        const p = getCurrentPool()
+        const p = await getCurrentPool()
         return p.getConnection()
     },
     end: () => Promise.all(Array.from(pools.values()).map((workspacePool) => workspacePool.end()))
