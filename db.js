@@ -39,14 +39,24 @@ const ensureSchema = async (targetPool) => {
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
         )
         
-        // 2. Brands table
+        // 2. Brands table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS brands (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
             "brand_name VARCHAR(255) NULL)"
         )
 
-        // 3. Items table & columns
+        // 3. Suppliers table & columns
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS suppliers (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "name VARCHAR(255) NULL)"
+        )
+        try {
+            await targetPool.query("ALTER TABLE suppliers ADD COLUMN supplier_name VARCHAR(255) NULL")
+        } catch (e) { if (e.errno !== 1060) {} }
+
+        // 4. Items table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS items (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -64,7 +74,7 @@ const ensureSchema = async (targetPool) => {
             } catch (e) { if (e.errno !== 1060) {} }
         }
 
-        // 4. Warehouse table & columns
+        // 5. Warehouse table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS warehouse (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -74,7 +84,7 @@ const ensureSchema = async (targetPool) => {
             await targetPool.query("ALTER TABLE warehouse ADD COLUMN warehouse_name VARCHAR(255) NULL")
         } catch (e) { if (e.errno !== 1060) {} }
 
-        // 5. Shelves table & columns
+        // 6. Shelves table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS shelves (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -84,6 +94,37 @@ const ensureSchema = async (targetPool) => {
         try {
             await targetPool.query("ALTER TABLE shelves ADD COLUMN shelf_code VARCHAR(100) NULL")
         } catch (e) { if (e.errno !== 1060) {} }
+
+        // 7. Inventory table & columns
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS inventory (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "item_id INT NOT NULL, " +
+            "quantity DECIMAL(15,3) NOT NULL DEFAULT 0)"
+        )
+        try {
+            await targetPool.query("ALTER TABLE inventory ADD COLUMN warehouse_id INT NULL")
+        } catch (e) { if (e.errno !== 1060) {} }
+
+        // 8. Financial Journal table & columns
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS financial_journal (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "remaining_debt DECIMAL(15,2) NOT NULL DEFAULT 0, " +
+            "remaining_receivables DECIMAL(15,2) NOT NULL DEFAULT 0)"
+        )
+        const journalColumns = [
+            "ADD COLUMN order_date DATE NULL",
+            "ADD COLUMN purchase_settlement_date DATE NULL",
+            "ADD COLUMN purchase_due_date DATE NULL",
+            "ADD COLUMN sale_settlement_date DATE NULL",
+            "ADD COLUMN sale_due_date DATE NULL"
+        ]
+        for (const colQuery of journalColumns) {
+            try {
+                await targetPool.query(`ALTER TABLE financial_journal ${colQuery}`)
+            } catch (e) { if (e.errno !== 1060) {} }
+        }
 
         initializedPools.add(poolKey)
     } catch (err) {
