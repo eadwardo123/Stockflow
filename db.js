@@ -24,11 +24,12 @@ const quoteIdentifier = (value) => {
     return "`" + String(value).replace(/`/g, "``") + "`"
 }
 
-// Lightweight target check to ensure inventory_transactions exists
-const ensureInventoryTransactionsTable = async (targetPool) => {
+// Automatically ensure required tables and columns exist
+const ensureSchema = async (targetPool) => {
     const poolKey = targetPool.pool?.config?.database || 'pool'
     if (initializedPools.has(poolKey)) return
     try {
+        // 1. Inventory Transactions table
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS inventory_transactions (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -37,6 +38,27 @@ const ensureInventoryTransactionsTable = async (targetPool) => {
             "quantity DECIMAL(15,3) NOT NULL DEFAULT 0, " +
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
         )
+        
+        // 2. Items table & item_name column
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS items (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "name VARCHAR(255) NULL)"
+        )
+        try {
+            await targetPool.query("ALTER TABLE items ADD COLUMN item_name VARCHAR(255) NULL")
+        } catch (e) { if (e.errno !== 1060) {} }
+
+        // 3. Warehouse table & warehouse_name column
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS warehouse (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "name VARCHAR(255) NULL)"
+        )
+        try {
+            await targetPool.query("ALTER TABLE warehouse ADD COLUMN warehouse_name VARCHAR(255) NULL")
+        } catch (e) { if (e.errno !== 1060) {} }
+
         initializedPools.add(poolKey)
     } catch (err) {
         console.error("Table initialization note:", err.message)
@@ -53,7 +75,7 @@ const getPool = (databaseName) => {
 const getCurrentPool = async () => {
     const dbName = workspaceContext.getStore() || baseDatabase
     const p = getPool(dbName)
-    await ensureInventoryTransactionsTable(p)
+    await ensureSchema(p)
     return p
 }
 
@@ -86,7 +108,7 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
     )
 
     const workspacePool = getPool(databaseName)
-    await ensureInventoryTransactionsTable(workspacePool)
+    await ensureSchema(workspacePool)
 }
 
 const pool = {
