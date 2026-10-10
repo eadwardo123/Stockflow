@@ -18,13 +18,14 @@ const poolOptions = {
 const basePool = mysql.createPool({...poolOptions, database: baseDatabase})
 const pools = new Map([[baseDatabase, basePool]])
 const workspaceContext = new AsyncLocalStorage()
+const initializedDatabases = new Set()
 
 const quoteIdentifier = (value) => `\`${String(value).replace(/`/g, '``')}\``
 
 // Automatically ensure all core tables and columns exist on any database pool
 const ensureTableAndColumns = async (targetPool) => {
     try {
-        // 1. Items table (Parent for inventory & pre_orders)
+        // 1. Items table & columns
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -32,6 +33,11 @@ const ensureTableAndColumns = async (targetPool) => {
                 minimum_stock DECIMAL(15,3) NOT NULL DEFAULT 0
             )
         `);
+        try {
+            await targetPool.query(`ALTER TABLE items ADD COLUMN minimum_stock DECIMAL(15,3) NOT NULL DEFAULT 0`);
+        } catch (colErr) {
+            if (colErr.errno !== 1060) { /* Ignore duplicate column error */ }
+        }
 
         // 2. Inventory table
         await targetPool.query(`
@@ -98,7 +104,7 @@ const ensureTableAndColumns = async (targetPool) => {
             try {
                 await targetPool.query(query);
             } catch (colErr) {
-                if (colErr.errno !== 1060) { // Ignore duplicate column errors
+                if (colErr.errno !== 1060) {
                     // Safe ignore
                 }
             }
@@ -110,11 +116,19 @@ const ensureTableAndColumns = async (targetPool) => {
 
 const getPool = (databaseName) => {
     if (!pools.has(databaseName)) {
-        const newPool = mysql.createPool({...poolOptions, database: databaseName})
-        ensureTableAndColumns(newPool)
-        pools.set(databaseName, newPool)
+        pools.set(databaseName, mysql.createPool({...poolOptions, database: databaseName}))
     }
     return pools.get(databaseName)
+}
+
+const ensureInitializedForCurrentContext = async () => {
+    const dbName = workspaceContext.getStore() || baseDatabase
+    const p = getPool(dbName)
+    if (!initializedDatabases.has(dbName)) {
+        await ensureTableAndColumns(p)
+        initializedDatabases.add(dbName)
+    }
+    return p
 }
 
 export const runWithWorkspaceDatabase = (databaseName, callback) =>
@@ -147,6 +161,7 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
 
     const workspacePool = getPool(databaseName)
     await ensureTableAndColumns(workspacePool)
+    initializedDatabases.add(databaseName)
 
     const [sourceTables] = await basePool.query(`
         SELECT TABLE_NAME AS table_name
@@ -198,21 +213,21 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
     }
 }
 
-const currentPool = () => {
-    const dbName = workspaceContext.getStore() || baseDatabase
-    const p = getPool(dbName)
-    ensureTableAndColumns(p)
-    return p
-}
-
+// Intercept all pool operations to guarantee tables and columns exist before any query runs
 const pool = {
-    query: (...args) => currentPool().query(...args),
-    execute: (...args) => currentPool().execute(...args),
-    getConnection: () => currentPool().getConnection(),
+    query: async (...args) => {
+        const p = await ensureInitializedForCurrentContext()
+        return p.query(...args)
+    },
+    execute: async (...args) => {
+        const p = await ensureInitializedForCurrentContext()
+        return p.execute(...args)
+    },
+    getConnection: async () => {
+        const p = await ensureInitializedForCurrentContext()
+        return p.getConnection()
+    },
     end: () => Promise.all([...pools.values()].map((workspacePool) => workspacePool.end()))
 }
-
-// Run on base pool startup too
-await ensureTableAndColumns(basePool)
 
 export default pool
