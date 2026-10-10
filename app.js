@@ -2739,6 +2739,9 @@ const runScheduledWorkspaceBackups = async () => {
 }
 
 const startServer = async () => {
+    console.log("STARTING SERVER INITIALIZATION...");
+    console.log("Database Host:", process.env.MYSQL_HOST);
+    console.log("Running DB setup queries...");
     await pool.query(`
         CREATE TABLE IF NOT EXISTS app_users (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
