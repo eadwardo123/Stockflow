@@ -62,16 +62,24 @@ const ensureSchema = async (targetPool) => {
             } catch (e) { if (e.errno !== 1060) {} }
         }
 
-        // 3. Purchase Orders table
+        // 3. Purchase Orders table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS purchase_orders (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
-            "supplier_id INT NULL, " +
-            "po_number VARCHAR(100) NULL, " +
-            "po_date DATE NULL, " +
-            "status VARCHAR(50) NOT NULL DEFAULT 'PENDING', " +
-            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+            "status VARCHAR(50) NOT NULL DEFAULT 'PENDING')"
         )
+        const poColumns = [
+            "ADD COLUMN supplier_id INT NULL",
+            "ADD COLUMN po_number VARCHAR(100) NULL",
+            "ADD COLUMN po_date DATE NULL",
+            "ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'PENDING'",
+            "ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ]
+        for (const colQuery of poColumns) {
+            try {
+                await targetPool.query(`ALTER TABLE purchase_orders ${colQuery}`)
+            } catch (e) { if (e.errno !== 1060) {} }
+        }
 
         // 4. Purchase Order Items table
         await targetPool.query(
@@ -105,7 +113,7 @@ const ensureSchema = async (targetPool) => {
             "markup_pct DECIMAL(5,2) NOT NULL DEFAULT 30)"
         )
 
-        // 8. Inventory Cost Layers table (FIFO)
+        // 8. Inventory Cost Layers table (FIFO) & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS inventory_cost_layers (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -113,6 +121,16 @@ const ensureSchema = async (targetPool) => {
             "remaining_quantity DECIMAL(15,3) NOT NULL DEFAULT 0, " +
             "unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0)"
         )
+        const costLayerColumns = [
+            "ADD COLUMN warehouse_id INT NULL",
+            "ADD COLUMN shelf_id INT NULL",
+            "ADD COLUMN received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ]
+        for (const colQuery of costLayerColumns) {
+            try {
+                await targetPool.query(`ALTER TABLE inventory_cost_layers ${colQuery}`)
+            } catch (e) { if (e.errno !== 1060) {} }
+        }
 
         // 9. Suppliers table & columns
         await targetPool.query(
