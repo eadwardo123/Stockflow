@@ -1567,11 +1567,18 @@ const ensureFinancialJournalDueDates = async () => {
                 SELECT COLUMN_NAME AS columnName
                 FROM information_schema.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'financial_journal'
-                  AND COLUMN_NAME IN ('purchase_due_date', 'sale_due_date')
             `)
             const existingColumns = new Set(columns.map((column) => column.columnName))
+
+            // Ensure base table has all required columns safely
+            if (!existingColumns.has('purchase_settlement_date')) {
+                await pool.query('ALTER TABLE financial_journal ADD COLUMN purchase_settlement_date DATE NULL')
+            }
             if (!existingColumns.has('purchase_due_date')) {
                 await pool.query('ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL')
+            }
+            if (!existingColumns.has('sale_settlement_date')) {
+                await pool.query('ALTER TABLE financial_journal ADD COLUMN sale_settlement_date DATE NULL')
             }
             if (!existingColumns.has('sale_due_date')) {
                 await pool.query('ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL')
