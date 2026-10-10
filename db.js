@@ -25,7 +25,32 @@ const quoteIdentifier = (value) => `\`${String(value).replace(/`/g, '``')}\``
 // Automatically ensure all core tables and columns exist on any database pool
 const ensureTableAndColumns = async (targetPool) => {
     try {
-        // 1. Items table & columns
+        // 1. Warehouse table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS warehouse (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NULL
+            )
+        `);
+
+        // 2. Shelves table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS shelves (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NULL,
+                warehouse_id INT NULL
+            )
+        `);
+
+        // 3. Suppliers table
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NULL
+            )
+        `);
+
+        // 4. Items table & columns
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,7 +64,7 @@ const ensureTableAndColumns = async (targetPool) => {
             if (colErr.errno !== 1060) { /* Ignore duplicate column error */ }
         }
 
-        // 2. Inventory table
+        // 5. Inventory table
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS inventory (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -49,7 +74,7 @@ const ensureTableAndColumns = async (targetPool) => {
             )
         `);
 
-        // 3. Purchase Orders table
+        // 6. Purchase Orders table
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS purchase_orders (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -57,7 +82,7 @@ const ensureTableAndColumns = async (targetPool) => {
             )
         `);
 
-        // 4. Stock Transfers table
+        // 7. Stock Transfers table
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS stock_transfers (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -65,7 +90,7 @@ const ensureTableAndColumns = async (targetPool) => {
             )
         `);
 
-        // 5. Pre Orders table
+        // 8. Pre Orders table
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS pre_orders (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -82,7 +107,7 @@ const ensureTableAndColumns = async (targetPool) => {
             )
         `);
 
-        // 6. Financial Journal table & columns
+        // 9. Financial Journal table & columns
         await targetPool.query(`
             CREATE TABLE IF NOT EXISTS financial_journal (
                 id INT AUTO_INCREMENT PRIMARY KEY,
