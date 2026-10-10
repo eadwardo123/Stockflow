@@ -39,14 +39,39 @@ const ensureSchema = async (targetPool) => {
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
         )
         
-        // 2. Brands table & columns
+        // 2. Brands table
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS brands (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
             "brand_name VARCHAR(255) NULL)"
         )
 
-        // 3. Suppliers table & columns
+        // 3. Units table & columns
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS units (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "unit_name VARCHAR(100) NULL)"
+        )
+
+        // 4. Item Costs table
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS item_costs (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "item_id INT NOT NULL, " +
+            "avg_cost DECIMAL(15,4) NOT NULL DEFAULT 0, " +
+            "markup_pct DECIMAL(5,2) NOT NULL DEFAULT 30)"
+        )
+
+        // 5. Inventory Cost Layers table (FIFO)
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS inventory_cost_layers (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "item_id INT NOT NULL, " +
+            "remaining_quantity DECIMAL(15,3) NOT NULL DEFAULT 0, " +
+            "unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0)"
+        )
+
+        // 6. Suppliers table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS suppliers (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -56,7 +81,7 @@ const ensureSchema = async (targetPool) => {
             await targetPool.query("ALTER TABLE suppliers ADD COLUMN supplier_name VARCHAR(255) NULL")
         } catch (e) { if (e.errno !== 1060) {} }
 
-        // 4. Items table & columns
+        // 7. Items table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS items (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -74,7 +99,7 @@ const ensureSchema = async (targetPool) => {
             } catch (e) { if (e.errno !== 1060) {} }
         }
 
-        // 5. Warehouse table & columns
+        // 8. Warehouse table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS warehouse (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -84,7 +109,7 @@ const ensureSchema = async (targetPool) => {
             await targetPool.query("ALTER TABLE warehouse ADD COLUMN warehouse_name VARCHAR(255) NULL")
         } catch (e) { if (e.errno !== 1060) {} }
 
-        // 6. Shelves table & columns
+        // 9. Shelves table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS shelves (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -95,7 +120,7 @@ const ensureSchema = async (targetPool) => {
             await targetPool.query("ALTER TABLE shelves ADD COLUMN shelf_code VARCHAR(100) NULL")
         } catch (e) { if (e.errno !== 1060) {} }
 
-        // 7. Inventory table & columns
+        // 10. Inventory table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS inventory (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -106,7 +131,7 @@ const ensureSchema = async (targetPool) => {
             await targetPool.query("ALTER TABLE inventory ADD COLUMN warehouse_id INT NULL")
         } catch (e) { if (e.errno !== 1060) {} }
 
-        // 8. Financial Journal table & columns
+        // 11. Financial Journal table & columns
         await targetPool.query(
             "CREATE TABLE IF NOT EXISTS financial_journal (" +
             "id INT AUTO_INCREMENT PRIMARY KEY, " +
@@ -114,6 +139,7 @@ const ensureSchema = async (targetPool) => {
             "remaining_receivables DECIMAL(15,2) NOT NULL DEFAULT 0)"
         )
         const journalColumns = [
+            "ADD COLUMN number VARCHAR(100) NULL",
             "ADD COLUMN order_date DATE NULL",
             "ADD COLUMN purchase_settlement_date DATE NULL",
             "ADD COLUMN purchase_due_date DATE NULL",
