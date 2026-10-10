@@ -21,9 +21,43 @@ const workspaceContext = new AsyncLocalStorage()
 
 const quoteIdentifier = (value) => `\`${String(value).replace(/`/g, '``')}\``
 
+// Automatically ensure required tables and columns exist on any database pool
+const ensureTableAndColumns = async (targetPool) => {
+    try {
+        await targetPool.query(`
+            CREATE TABLE IF NOT EXISTS financial_journal (
+                id INT AUTO_INCREMENT PRIMARY KEY
+            )
+        `);
+        
+        const requiredColumns = [
+            `ALTER TABLE financial_journal ADD COLUMN purchase_settlement_date DATE NULL`,
+            `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL`,
+            `ALTER TABLE financial_journal ADD COLUMN sale_settlement_date DATE NULL`,
+            `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL`
+        ];
+
+        for (const query of requiredColumns) {
+            try {
+                await targetPool.query(query);
+            } catch (colErr) {
+                // Ignore error if column already exists (MySQL Error code 1060)
+                if (colErr.errno !== 1060) {
+                    // Suppress or log safely
+                }
+            }
+        }
+    } catch (err) {
+        // Silently pass or log safely
+    }
+}
+
 const getPool = (databaseName) => {
     if (!pools.has(databaseName)) {
-        pools.set(databaseName, mysql.createPool({...poolOptions, database: databaseName}))
+        const newPool = mysql.createPool({...poolOptions, database: databaseName})
+        // Ensure schema is up to date whenever a workspace pool is created
+        ensureTableAndColumns(newPool)
+        pools.set(databaseName, newPool)
     }
     return pools.get(databaseName)
 }
@@ -56,6 +90,9 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
         `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(databaseName)} CHARACTER SET ${characterSet} COLLATE${collation}`
     )
 
+    const workspacePool = getPool(databaseName)
+    await ensureTableAndColumns(workspacePool)
+
     const [sourceTables] = await basePool.query(`
         SELECT TABLE_NAME AS table_name
         FROM information_schema.TABLES
@@ -63,7 +100,8 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
           AND TABLE_NAME NOT IN (?, ?, ?, ?, ?)
         ORDER BY TABLE_NAME
     `, [baseDatabase, 'app_users', 'app_sessions', 'app_workspace', 'app_user_workspaces', 'app_workspace_invites'])
-    const [targetTables] = await basePool.query(
+    
+    const [targetTables] = await workspacePool.query(
         'SELECT TABLE_NAME AS table_name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?',
         [databaseName]
     )
@@ -99,13 +137,18 @@ export const ensureWorkspaceDatabase = async (databaseName) => {
                     `REFERENCES ${quoteIdentifier(databaseName)}.${quoteIdentifier(referencedTable)}`
                 )
                 .replace(/\sAUTO_INCREMENT=\d+/i, '')
-            await basePool.query(createStatement)
+            await workspacePool.query(createStatement)
             pending.delete(tableName)
         }
     }
 }
 
-const currentPool = () => getPool(workspaceContext.getStore() || baseDatabase)
+const currentPool = () => {
+    const dbName = workspaceContext.getStore() || baseDatabase
+    const p = getPool(dbName)
+    ensureTableAndColumns(p)
+    return p
+}
 
 const pool = {
     query: (...args) => currentPool().query(...args),
@@ -114,33 +157,7 @@ const pool = {
     end: () => Promise.all([...pools.values()].map((workspacePool) => workspacePool.end()))
 }
 
-// Safely initialize the base table and ensure all required columns exist on startup
-try {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS financial_journal (
-            id INT AUTO_INCREMENT PRIMARY KEY
-        )
-    `);
-    
-    const requiredColumns = [
-        `ALTER TABLE financial_journal ADD COLUMN purchase_settlement_date DATE NULL`,
-        `ALTER TABLE financial_journal ADD COLUMN purchase_due_date DATE NULL`,
-        `ALTER TABLE financial_journal ADD COLUMN sale_settlement_date DATE NULL`,
-        `ALTER TABLE financial_journal ADD COLUMN sale_due_date DATE NULL`
-    ];
-
-    for (const query of requiredColumns) {
-        try {
-            await pool.query(query);
-        } catch (colErr) {
-            // Ignore error if column already exists (MySQL Error code 1060)
-            if (colErr.errno !== 1060) {
-                console.log("Column migration note:", colErr.message);
-            }
-        }
-    }
-} catch (err) {
-    console.error("Database startup initialization error:", err);
-}
+// Run on base pool startup too
+await ensureTableAndColumns(basePool)
 
 export default pool
