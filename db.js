@@ -197,6 +197,17 @@ const ensureSchema = async (targetPool) => {
                 await targetPool.query(`ALTER TABLE financial_journal ${colQuery}`)
             } catch (e) { if (e.errno !== 1060) {} }
         }
+
+        // 13. Financial Journal Import Summaries table
+        await targetPool.query(
+            "CREATE TABLE IF NOT EXISTS financial_journal_import_summaries (" +
+            "id INT AUTO_INCREMENT PRIMARY KEY, " +
+            "source_id VARCHAR(100) NULL, " +
+            "as_of_date DATE NULL, " +
+            "row_count INT NOT NULL DEFAULT 0, " +
+            "totals TEXT NULL, " +
+            "balances TEXT NULL)"
+        )
     } catch (err) {
         console.error("Table initialization note:", err.message)
     }
