@@ -50,13 +50,16 @@ const settingsMessage = document.getElementById('settingsMessage')
 workspaceSettingsForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
-        const csrfHeaders = typeof window.stockFlowCsrfHeaders === 'function' 
-            ? window.stockFlowCsrfHeaders() 
-            : (window.stockFlowCsrfHeaders || {});
-            
+        // Safely extract token from meta tag or global helper
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+                          (typeof window.stockFlowCsrfHeaders === 'function' ? window.stockFlowCsrfHeaders()['CSRF-Token'] : '');
+
         const response = await fetch('/api/workspace-settings/preferences', {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json', ...csrfHeaders},
+            headers: {
+                'Content-Type': 'application/json',
+                ...(csrfToken ? { 'CSRF-Token': csrfToken } : {})
+            },
             body: JSON.stringify(Object.fromEntries(new FormData(workspaceSettingsForm)))
         })
         const result = await response.json()
