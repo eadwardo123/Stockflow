@@ -47,28 +47,21 @@
 <script>
 const workspaceSettingsForm = document.getElementById('workspaceSettingsForm')
 const settingsMessage = document.getElementById('settingsMessage')
+const csrfToken = "{{csrfToken}}"
+
 workspaceSettingsForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-                          document.querySelector('meta[name="_csrf"]')?.getAttribute('content') ||
-                          document.querySelector('meta[name="x-csrf-token"]')?.getAttribute('content') || '';
-
         const response = await fetch('/api/workspace-settings/preferences', {
             method: 'PATCH',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                ...(csrfToken ? {
-                    'CSRF-Token': csrfToken,
-                    'x-csrf-token': csrfToken,
-                    'X-CSRF-Token': csrfToken,
-                    'X-XSRF-TOKEN': csrfToken
-                } : {})
+                'x-csrf-token': csrfToken
             },
             body: JSON.stringify({
                 ...Object.fromEntries(new FormData(workspaceSettingsForm)),
-                _csrf: csrfToken
+                csrfToken: csrfToken
             })
         })
         const result = await response.json()
@@ -84,4 +77,3 @@ workspaceSettingsForm.addEventListener('submit', async (event) => {
     }
 })
 </script>
-
