@@ -50,15 +50,20 @@ const settingsMessage = document.getElementById('settingsMessage')
 workspaceSettingsForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     try {
-        // Safely extract token from meta tag or global helper
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-                          (typeof window.stockFlowCsrfHeaders === 'function' ? window.stockFlowCsrfHeaders()['CSRF-Token'] : '');
+        // Grab token from any common meta tag selector
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                          document.querySelector('meta[name="_csrf"]')?.getAttribute('content') ||
+                          document.querySelector('meta[name="x-csrf-token"]')?.getAttribute('content') || '';
 
         const response = await fetch('/api/workspace-settings/preferences', {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                ...(csrfToken ? { 'CSRF-Token': csrfToken } : {})
+                ...(csrfToken ? {
+                    'CSRF-Token': csrfToken,
+                    'x-csrf-token': csrfToken,
+                    'X-CSRF-Token': csrfToken
+                } : {})
             },
             body: JSON.stringify(Object.fromEntries(new FormData(workspaceSettingsForm)))
         })
@@ -75,4 +80,7 @@ workspaceSettingsForm.addEventListener('submit', async (event) => {
     }
 })
 </script>
-```[cite: 2]
+
+git add .
+git commit -m "Support multiple CSRF header variations"
+git push origin main
