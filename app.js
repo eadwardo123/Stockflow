@@ -12,6 +12,7 @@ import {createCipheriv, createDecipheriv, createHash, randomBytes, scrypt as scr
 import {gunzipSync, gzipSync} from 'node:zlib'
 import pool, {ensureWorkspaceDatabase, runWithBaseDatabase, runWithWorkspaceDatabase} from './db.js'
 import inventoryRouter from './inventory.js';
+import Stripe from 'stripe';
 import http from 'http';
 import { Server } from 'socket.io';
 
@@ -20,6 +21,7 @@ app.use((req, res, next) => {
   req.io = io;
   next();
 });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const server = http.createServer(app);
 const io = new Server(server);
 const port = Number(process.env.PORT) || 3003
@@ -303,6 +305,38 @@ app.engine('handlebars', engine({
 app.set('view engine', 'handlebars')
 app.set('views', './views')
 
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error(`Webhook signature verification failed: ${err.message}`);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Listen for successful payments or subscription updates
+    if (event.type === 'invoice.payment_succeeded' || event.type === 'customer.subscription.updated') {
+        const subscription = event.data.object;
+        const customerId = subscription.customer;
+        const workspaceDb = subscription.metadata?.workspaceDatabase;
+
+        if (workspaceDb) {
+            await pool.query(`
+                INSERT INTO workspace_subscriptions (workspace_database, stripe_customer_id, stripe_subscription_id, status)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    stripe_subscription_id = VALUES(stripe_subscription_id),
+                    status = VALUES(status),
+                    updated_at = CURRENT_TIMESTAMP
+            `, [workspaceDb, customerId, subscription.id, subscription.status]);
+        }
+    }
+
+    res.json({ received: true });
+});
+
 app.use(express.json({limit: '1mb'}))
 app.use(express.urlencoded({
     extended: true,
@@ -391,6 +425,35 @@ app.use(async (req, res, next) => {
         return next(error)
     }
 })
+
+const requireActiveSubscription = async (req, res, next) => {
+    // Skip public routes, login, logout, static files, and billing/checkout routes
+    if (['/login', '/register', '/logout', '/workspace-settings'].includes(req.path) || 
+        req.path.startsWith('/api/webhooks') || 
+        req.path.startsWith('/api/create-checkout-session') ||
+        req.path.startsWith('/assets/')) {
+        return next();
+    }
+
+    if (!req.workspaceDatabase) return next();
+
+    const [[sub]] = await pool.query(
+        'SELECT status FROM workspace_subscriptions WHERE workspace_database = ?',
+        [req.workspaceDatabase]
+    );
+
+    // If no subscription found or status isn't active/trialing, block them
+    if (!sub || (sub.status !== 'active' && sub.status !== 'trialing')) {
+        if (req.path.startsWith('/api/')) {
+            return res.status(403).json({ error: 'Active subscription required. Please upgrade your plan.' });
+        }
+        return res.redirect('/workspace-settings?error=subscription_required');
+    }
+    next();
+};
+
+// Apply this middleware globally right after your workspace authentication middleware
+app.use(requireActiveSubscription);
 
 const createCsrfToken = (req) => {
     if (typeof req.session.csrfToken !== 'string' || !/^[a-f0-9]{64}$/.test(req.session.csrfToken)) {
@@ -569,6 +632,28 @@ app.get('/invite/:token', async (req, res) => {
         sendServerError(res, error)
     }
 })
+
+app.post('/api/create-checkout-session', requireWorkspaceRoles('owner'), async (req, res) => {
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price: process.env.STRIPE_PRICE_ID,
+                quantity: 1,
+            }],
+            mode: 'subscription',
+            success_url: `${req.protocol}://${req.get('host')}/workspace-settings?success=true`,
+            cancel_url: `${req.protocol}://${req.get('host')}/workspace-settings?canceled=true`,
+            metadata: {
+                workspaceDatabase: req.workspaceDatabase // Ties the payment directly to this workspace
+            }
+        });
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error('Stripe checkout error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.post('/register', registrationRateLimit, async (req, res) => {
     if (!verifyCsrfToken(req)) return renderAuth(res, 'register', 'Your form expired. Please try again.', createCsrfToken(req))
